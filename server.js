@@ -140,14 +140,24 @@ app.use(
 //   })
 // );
 
+const corsOptions = {
+  origin: '*', // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+};
 
-app.use(
-  cors({
-    origin: process.env.baseUrl || 'https://cashfluence-frontend.vercel.app/', // Allow your frontend domain
-    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
-    credentials: true, // Allow credentials (cookies, etc.)
-  })
-);
+// Apply the CORS middleware
+app.use(cors(corsOptions));
+
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.baseUrl || 'https://cashfluence-frontend.vercel.app/');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
+
 
 
 const authRoutes = require('./routes/authRoutes');
