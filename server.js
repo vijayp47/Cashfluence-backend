@@ -149,7 +149,7 @@ const corsOptions = {
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
-// app.options('*', cors(corsOptions))
+app.options('*', cors(corsOptions))
 // Handle preflight requests
 app.options('*', (req, res) => {
   res.header('Access-Control-Allow-Origin', process.env.baseUrl || 'https://cashfluence-frontend.vercel.app');
@@ -158,11 +158,6 @@ app.options('*', (req, res) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   res.sendStatus(204); // Respond with no content for preflight
 });
-
-
-
-
-
 
 const authRoutes = require('./routes/authRoutes');
 const kycRoutes = require('./routes/kycRoutes');
