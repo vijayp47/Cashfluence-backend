@@ -133,12 +133,22 @@ app.use(
 );
 
 // Enable CORS for frontend domain
+// app.use(
+//   cors({
+//     origin: process.env.baseUrl, // Replace with frontend URL
+//     credentials: true,
+//   })
+// );
+
+
 app.use(
   cors({
-    origin: process.env.baseUrl, // Replace with frontend URL
-    credentials: true,
+    origin: process.env.baseUrl || 'https://cashfluence-frontend.vercel.app/', // Allow your frontend domain
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
+    credentials: true, // Allow credentials (cookies, etc.)
   })
 );
+
 
 const authRoutes = require('./routes/authRoutes');
 const kycRoutes = require('./routes/kycRoutes');
