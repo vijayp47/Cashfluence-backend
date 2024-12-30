@@ -132,32 +132,33 @@ app.use(
   })
 );
 
-// Enable CORS for frontend domain
-// app.use(
-//   cors({
-//     origin: process.env.baseUrl, // Replace with frontend URL
-//     credentials: true,
-//   })
-// );
-
 const corsOptions = {
-  origin: process.env.baseUrl || 'https://cashfluence-frontend.vercel.app', // Frontend URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
-  credentials: true, // Allow credentials (cookies, etc.)
+  origin: process.env.baseUrl || "https://cashfluence-frontend.vercel.app", // Replace with your frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed methods
+  allowedHeaders: ["Content-Type", "Authorization"], // Allowed headers
+  credentials: true, // Allow cookies or credentials
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions))
+
+// Handle preflight OPTIONS requests
+app.options("*", cors(corsOptions));
+
 // Handle preflight requests
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', process.env.baseUrl || 'https://cashfluence-frontend.vercel.app');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(204); // Respond with no content for preflight
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", process.env.baseUrl || "https://cashfluence-frontend.vercel.app");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204); // No content for preflight requests
+  }
+
+  next();
 });
+
 
 const authRoutes = require('./routes/authRoutes');
 const kycRoutes = require('./routes/kycRoutes');
