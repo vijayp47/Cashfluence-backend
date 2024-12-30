@@ -141,7 +141,15 @@ const corsOptions = {
 
 // Apply CORS middleware globally
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight OPTIONS requests
+
+// Handle preflight OPTIONS requests explicitly
+app.options('*', (req, res) => {
+  res.header("Access-Control-Allow-Origin", process.env.baseUrl || "https://cashfluence-frontend.vercel.app");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.sendStatus(204);
+});
 
 // Static file handling
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
