@@ -1073,6 +1073,9 @@ const getUserAccountData = async (req, res) => {
   }
 };
 
+const testVercel = async (req, res) => {
+  res.status(201).json({ success: true, data: "Hello, this is for testing purpose" });
+};
 
 module.exports = {
   createLinkToken,
@@ -1082,5 +1085,6 @@ module.exports = {
   getRiskScoreController,idvPlaidToken,
   plaidIDVComplete,clearOldSessions,
   getPlaidUserData,PlaidResetIdv,
-  prefillUserData
+  prefillUserData,
+  testVercel
 };
