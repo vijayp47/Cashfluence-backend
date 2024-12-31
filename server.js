@@ -105,6 +105,24 @@ dotenv.config();
 // Initialize express app
 const app = express();
 
+const corsOptions = {
+  origin: process.env.baseUrl || "https://cashfluence-frontend.vercel.app", // Frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true, // Allow cookies and credentials
+};
+
+// Apply CORS middleware globally
+
+// Handle preflight OPTIONS requests explicitly
+app.options('*', (req, res) => {
+  res.header("Access-Control-Allow-Origin", process.env.baseUrl || "https://cashfluence-frontend.vercel.app");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.sendStatus(204);
+});
+
 app.use(cors(corsOptions));
 // Middleware to parse JSON
 app.use(express.json());
@@ -132,24 +150,7 @@ app.use(
   })
 );
 
-// CORS configuration
-const corsOptions = {
-  origin: process.env.baseUrl || "https://cashfluence-frontend.vercel.app", // Frontend URL
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true, // Allow cookies and credentials
-};
 
-// Apply CORS middleware globally
-
-// Handle preflight OPTIONS requests explicitly
-app.options('*', (req, res) => {
-  res.header("Access-Control-Allow-Origin", process.env.baseUrl || "https://cashfluence-frontend.vercel.app");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.sendStatus(204);
-});
 
 // Static file handling
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
