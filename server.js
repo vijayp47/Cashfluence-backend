@@ -105,6 +105,7 @@ dotenv.config();
 // Initialize express app
 const app = express();
 
+app.use(cors(corsOptions));
 // Middleware to parse JSON
 app.use(express.json());
 
@@ -140,7 +141,6 @@ const corsOptions = {
 };
 
 // Apply CORS middleware globally
-app.use(cors(corsOptions));
 
 // Handle preflight OPTIONS requests explicitly
 app.options('*', (req, res) => {
