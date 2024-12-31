@@ -48,9 +48,9 @@ const messages = require('../constants/Messages');
 // Load environment variables
 dotenv.config();
 
+// Initialize Sequelize with environment variables
 const sequelize = process.env.DATABASE_URL
-  ? // Use DATABASE_URL if provided
-    new Sequelize(process.env.DATABASE_URL, {
+  ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
       protocol: 'postgres',
       logging: false, // Disable logging for production
@@ -61,11 +61,10 @@ const sequelize = process.env.DATABASE_URL
         },
       },
     })
-  : // Fallback to environment variables for local development
-    new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
+  : new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
       host: process.env.DB_HOST,
       dialect: process.env.DB_DIALECT || 'postgres',
-      logging: false,
+      logging: true, // Enable logging locally for debugging
       dialectOptions: {
         ssl: process.env.NODE_ENV === 'production'
           ? {
@@ -76,22 +75,31 @@ const sequelize = process.env.DATABASE_URL
       },
     });
 
+// Function to authenticate the database connection
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
     console.log(messages?.DB_CONNECTED || 'Database connected successfully.');
   } catch (error) {
-    console.error(messages?.DATABASE_ERROR || 'Database connection error:', error.message);
+    console.error(
+      messages?.DATABASE_ERROR || 'Database connection error:',
+      error.message || error
+    );
     throw new Error(error.message);
   }
 };
 
+// Function to synchronize database models
 const syncDB = async () => {
   try {
-    await sequelize.sync({ force: false });
+    // Set force: false to avoid overwriting existing tables
+    await sequelize.sync({ alter: true }); // Use `alter: true` to sync without dropping tables
     console.log(messages?.DATABASE_SYNC || 'Database synchronized successfully.');
   } catch (error) {
-    console.error(messages?.DATABASE_SYNC || 'Database synchronization error:', error.message);
+    console.error(
+      messages?.DATABASE_SYNC || 'Database synchronization error:',
+      error.message || error
+    );
     throw new Error(error.message);
   }
 };
