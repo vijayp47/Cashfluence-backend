@@ -736,7 +736,7 @@ const getPlaidUserData = async (req, res) => {
     });
 
     if (!plaidUser) {
-      return res.status(404).json({ message: "Plaid User not found" });
+      return res.status(200).json({ message: "Plaid User not found" });
     }
 
     // Send the detailed user data
@@ -797,7 +797,7 @@ const getpliadUserIdvStauts = async (req, res) => {
     console.log("plaiduser....",plaidUser)
 
     if (!plaidUser) {
-      return res.status(404).json({ message: "Plaid User not found" });
+      return res.status(200).json({ message: "Plaid User not found" });
     }
 
     // Send the detailed user data
