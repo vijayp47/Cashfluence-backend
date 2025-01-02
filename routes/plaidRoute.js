@@ -18,8 +18,7 @@ const {
   plaidIDVComplete,
   PlaidResetIdv,
   getpliadUserIdvStauts,
-  prefillUserData,
-  testVercel
+  prefillUserData,getPlaidUserState
 } = require('../controllers/plaidController');
 
 // Define Routes
@@ -36,6 +35,6 @@ router.post('/get-plaid-user', authenticateAdmin, getPlaidUserData);
 router.post('/retry-idv', authenticateUser, PlaidResetIdv);
 router.post('/user-idvStatus', authenticateUser, getpliadUserIdvStauts);
 router.post('/prefill_idv_data', authenticateUser, prefillUserData);
-router.get('/test-vercel', testVercel);
+router.post('/plaid_user_state', authenticateUser, getPlaidUserState)
 
 module.exports = router;

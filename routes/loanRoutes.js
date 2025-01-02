@@ -11,7 +11,7 @@ router.post('/apply', authenticateUser, applyForLoan);
 router.get('/all', authenticateAdmin, getAllLoans);
 
 // Admin route to update loan status
-router.patch('/:id', authenticateAdmin,updateLoanStatus);
+router.post('/:id', authenticateAdmin,updateLoanStatus);
 
 router.get('/:loanId/pending-status', checkPendingPayments);
 

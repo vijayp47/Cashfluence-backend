@@ -223,7 +223,6 @@ const getLiabilities = async (req, res) => {
   }
 };
 
-
 // Controller function to handle the risk score request
 const getRiskScoreController = async (req, res) => {
 
@@ -337,6 +336,8 @@ const idvPlaidToken = async (req, res, next) => {
     next(error);
   }
 };
+
+
 const updateUserRecordForIDVSession = async (idvSession, userId) => {
   try {
     const plaidResponse = await plaidClient.identityVerificationGet({
@@ -344,196 +345,6 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
     });
 
      const identityData = plaidResponse.data;
-    // const identityData = {
-    //   "id": "idv_52xR9LKo77r1Np",
-    //   "client_user_id": "your-db-id-3b24110",
-    //   "created_at": "2020-07-24T03:26:02Z",
-    //   "completed_at": "2020-07-24T03:26:02Z",
-    //   "previous_attempt_id": "idv_42cF1MNo42r9Xj",
-    //   "shareable_url": "https://flow.plaid.com/verify/idv_4FrXJvfQU3zGUR?key=e004115db797f7cc3083bff3167cba30644ef630fb46f5b086cde6cc3b86a36f",
-    //   "template": {
-    //     "id": "idvtmp_4FrXJvfQU3zGUR",
-    //     "version": 2
-    //   },
-    //   "user": {
-    //     "phone_number": "+12345678909",
-    //     "date_of_birth": "1990-05-29",
-    //     "ip_address": "192.0.2.42",
-    //     "email_address": "user@example.com",
-    //     "name": {
-    //       "given_name": "Leslie",
-    //       "family_name": "Knope"
-    //     },
-    //     "address": {
-    //       "street": "123 Main St.",
-    //       "street2": "Unit 42",
-    //       "city": "Pawnee",
-    //       "region": "IN",
-    //       "postal_code": "46001",
-    //       "country": "US"
-    //     },
-    //     "id_number": {
-    //       "value": "123456789",
-    //       "type": "us_ssn"
-    //     }
-    //   },
-    //   "status": "success",
-    //   "steps": {
-    //     "accept_tos": "success",
-    //     "verify_sms": "success",
-    //     "kyc_check": "success",
-    //     "documentary_verification": "success",
-    //     "selfie_check": "success",
-    //     "watchlist_screening": "success",
-    //     "risk_check": "success"
-    //   },
-    //   "documentary_verification": {
-    //     "status": "success",
-    //     "documents": [
-    //       {
-    //         "status": "success",
-    //         "attempt": 1,
-    //         "images": {
-    //           "original_front": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/documents/1/original_front.jpeg",
-    //           "original_back": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/documents/1/original_back.jpeg",
-    //           "cropped_front": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/documents/1/cropped_front.jpeg",
-    //           "cropped_back": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/documents/1/cropped_back.jpeg",
-    //           "face": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/documents/1/face.jpeg"
-    //         },
-    //         "extracted_data": {
-    //           "id_number": "AB123456",
-    //           "category": "drivers_license",
-    //           "expiration_date": "1990-05-29",
-    //           "issuing_country": "US",
-    //           "issuing_region": "IN",
-    //           "date_of_birth": "1990-05-29",
-    //           "address": {
-    //             "street": "123 Main St. Unit 42",
-    //             "city": "Pawnee",
-    //             "region": "IN",
-    //             "postal_code": "46001",
-    //             "country": "US"
-    //           },
-    //           "name": {
-    //             "given_name": "Leslie",
-    //             "family_name": "Knope"
-    //           }
-    //         },
-    //         "analysis": {
-    //           "authenticity": "match",
-    //           "image_quality": "high",
-    //           "extracted_data": {
-    //             "name": "match",
-    //             "date_of_birth": "match",
-    //             "expiration_date": "not_expired",
-    //             "issuing_country": "match"
-    //           }
-    //         },
-    //         "redacted_at": "2020-07-24T03:26:02Z"
-    //       }
-    //     ]
-    //   },
-    //   "selfie_check": {
-    //     "status": "success",
-    //     "selfies": [
-    //       {
-    //         "status": "success",
-    //         "attempt": 1,
-    //         "capture": {
-    //           "image_url": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/selfie/liveness.jpeg",
-    //           "video_url": "https://example.plaid.com/verifications/idv_52xR9LKo77r1Np/selfie/liveness.webm"
-    //         },
-    //         "analysis": {
-    //           "document_comparison": "match",
-    //           "liveness_check": "success"
-    //         }
-    //       }
-    //     ]
-    //   },
-    //   "kyc_check": {
-    //     "status": "success",
-    //     "address": {
-    //       "summary": "match",
-    //       "po_box": "yes",
-    //       "type": "residential"
-    //     },
-    //     "name": {
-    //       "summary": "match"
-    //     },
-    //     "date_of_birth": {
-    //       "summary": "match"
-    //     },
-    //     "id_number": {
-    //       "summary": "match"
-    //     },
-    //     "phone_number": {
-    //       "summary": "match",
-    //       "area_code": "match"
-    //     }
-    //   },
-    //   "risk_check": {
-    //     "status": "success",
-    //     "behavior": {
-    //       "user_interactions": "risky",
-    //       "fraud_ring_detected": "yes",
-    //       "bot_detected": "yes"
-    //     },
-    //     "email": {
-    //       "is_deliverable": "yes",
-    //       "breach_count": 1,
-    //       "first_breached_at": "1990-05-29",
-    //       "last_breached_at": "1990-05-29",
-    //       "domain_registered_at": "1990-05-29",
-    //       "domain_is_free_provider": "yes",
-    //       "domain_is_custom": "yes",
-    //       "domain_is_disposable": "yes",
-    //       "top_level_domain_is_suspicious": "yes",
-    //       "linked_services": [
-    //         "apple"
-    //       ]
-    //     },
-    //     "phone": {
-    //       "linked_services": [
-    //         "apple"
-    //       ]
-    //     },
-    //     "devices": [
-    //       {
-    //         "ip_proxy_type": "none_detected",
-    //         "ip_spam_list_count": 1,
-    //         "ip_timezone_offset": "+06:00:00"
-    //       }
-    //     ],
-    //     "identity_abuse_signals": {
-    //       "synthetic_identity": {
-    //         "score": 0
-    //       },
-    //       "stolen_identity": {
-    //         "score": 0
-    //       }
-    //     }
-    //   },
-    //   "verify_sms": {
-    //     "status": "success",
-    //     "verifications": [
-    //       {
-    //         "status": "success",
-    //         "attempt": 1,
-    //         "phone_number": "+12345678909",
-    //         "delivery_attempt_count": 1,
-    //         "solve_attempt_count": 1,
-    //         "initially_sent_at": "2020-07-24T03:26:02Z",
-    //         "last_sent_at": "2020-07-24T03:26:02Z",
-    //         "redacted_at": "2020-07-24T03:26:02Z"
-    //       }
-    //     ]
-    //   },
-    //   "watchlist_screening_id": "scr_52xR9LKo77r1Np",
-    //   "beacon_user_id": "becusr_42cF1MNo42r9Xj",
-    //   "redacted_at": "2020-07-24T03:26:02Z",
-    //   "request_id": "saKrIBuEB9qJZng"
-    // };
-
 
     const {
       user,
@@ -675,6 +486,7 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
   }
 };
 
+
 const plaidIDVComplete = async (req, res, next) => {
   try {
     const { metadata, userId } = req.body;
@@ -713,7 +525,8 @@ const plaidIDVComplete = async (req, res, next) => {
     }
 
     // If no rows were updated and no user was created
-    return res.status(400).json({ message: 'Failed to update user record' });
+    // return res.status(500).json({ message: 'Internal server error' });
+    return res.status(200).json({ message: 'Plaid Idv Complete Successfully' });
   } catch (error) {
     console.error('Error in Plaid IDV complete:', error);
     next(error);  // Forward to error handling middleware
@@ -937,8 +750,6 @@ const updateLatestIDVSession = async (user_id, idvSession) => {
 // };
 
 
-
-
 const getTransactions = async (req, res) => {
   const { accessToken, startDate, endDate } = req.body;
 
@@ -1073,6 +884,65 @@ const getUserAccountData = async (req, res) => {
   }
 };
 
+const getPlaidUserState = async (req, res) => {
+  try {
+    // Extract user_id from request query or body
+    const { user_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ message: "user_id is required" });
+    }
+
+    // Fetch the user record
+    const plaidUser = await PlaidUser.findOne({
+      where: { user_id },
+    });
+
+    if (!plaidUser) {
+      return res.status(200).json({
+        message: "Plaid User not found. Please complete identity verification and KYC on the profile page.",
+      });
+    }
+
+    // Extract the address from the user's data
+    const { address } = plaidUser;
+
+    if (!address) {
+      return res.status(200).json({
+        message: "Address not found for the user. Please complete your profile.",
+      });
+    }
+
+    // Parse the address to extract the state
+    const addressParts = address.split(',').map((part) => part.trim());
+    
+    // Ensure the address has enough parts to contain a state
+    if (addressParts.length >= 4) {
+      // The state is typically the third-to-last part in the address
+      const state = addressParts[addressParts.length - 3]; // The part that should contain the state
+
+      // If the state is a two-letter abbreviation, return it
+      if (state && state.length === 2) {
+        return res.status(200).json({
+          message: "State retrieved successfully",
+          state,
+        });
+      } else {
+        return res.status(200).json({
+          message: "State not found or invalid format. Please verify your address.",
+        });
+      }
+    } else {
+      return res.status(200).json({
+        message: "Invalid address format. Please verify your address.",
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching Plaid user data:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 const testVercel = async (req, res) => {
   res.status(201).json({ success: true, data: "Hello, this is for testing purpose" });
 };
@@ -1085,6 +955,6 @@ module.exports = {
   getRiskScoreController,idvPlaidToken,
   plaidIDVComplete,clearOldSessions,
   getPlaidUserData,PlaidResetIdv,
-  prefillUserData,
+  prefillUserData,getPlaidUserState,
   testVercel
 };

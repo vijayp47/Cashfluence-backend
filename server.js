@@ -195,8 +195,10 @@ const startServer = async () => {
 
     // Start the server
     const PORT = process.env.PORT || 3000;
+    // console.log(PORT)
     app.listen(PORT, () => {
       console.log(messages?.SERVER_PORT || `Server running on port ${PORT}`);
+      console.log(PORT)
     });
   } catch (err) {
     console.error(messages?.DB_CONNECTION_ERROR || 'Failed to start server:', err);

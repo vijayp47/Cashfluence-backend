@@ -41,6 +41,10 @@
 // // Export the Sequelize instance, models, and utility functions for use elsewhere in the application
 // module.exports = { sequelize, connectDB, syncDB };
 
+
+
+
+// for vercel
 const { Sequelize } = require('sequelize');
 const dotenv = require('dotenv');
 const messages = require('../constants/Messages');

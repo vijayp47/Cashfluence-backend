@@ -573,7 +573,7 @@ const fetchDataFromdatabase = async (req, res) => {
 const fetchStateLawFromDatabase = async (req, res) => {
   try {
     const { state, loan_term, loan_amount } = req.query;
-
+    // console.log(state,loan_term,loan_amount)
     // Validate input parameters
     if (!state || !loan_term || !loan_amount) {
       return res.status(400).json({
@@ -593,10 +593,11 @@ const fetchStateLawFromDatabase = async (req, res) => {
     // Fetch all potential rows for the given state and loan_term
     const allData = await InterestRateStateData.findAll({
       where: {
-        state,
+        state_code : state,
         loan_term,
       },
     });
+
 
     if (!allData || allData.length === 0) {
       return res.status(200).json({
@@ -622,7 +623,6 @@ if (filteredData.length === 0) {
         message: "No matching data found for the given loan amount.",
       });
     }
-
     // Return the first matched result (or customize as needed)
     return res.status(200).json({
       success: true,
