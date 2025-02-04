@@ -1,3 +1,5 @@
+// for local
+
 // const { Sequelize } = require('sequelize');
 // const dotenv = require('dotenv');
 // const messages = require('../constants/Messages');
@@ -45,6 +47,7 @@
 
 
 // for vercel
+
 const { Sequelize } = require('sequelize');
 const dotenv = require('dotenv');
 const messages = require('../constants/Messages');

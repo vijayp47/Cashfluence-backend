@@ -21,6 +21,13 @@ const {
   prefillUserData,getPlaidUserState
 } = require('../controllers/plaidController');
 
+
+
+const {
+  createACHLinkToken,
+  exchangePublicToken,
+  createTransferAuthorization,
+} = require('../controllers/ACHPlaid');
 // Define Routes
 router.post('/public_token', authenticateUser, plaidPublicToken);
 router.post('/create_link_token', authenticateUser, createLinkToken);
@@ -35,6 +42,14 @@ router.post('/get-plaid-user', authenticateAdmin, getPlaidUserData);
 router.post('/retry-idv', authenticateUser, PlaidResetIdv);
 router.post('/user-idvStatus', authenticateUser, getpliadUserIdvStauts);
 router.post('/prefill_idv_data', authenticateUser, prefillUserData);
-router.post('/plaid_user_state', authenticateUser, getPlaidUserState)
+router.post('/plaid_user_state', authenticateUser, getPlaidUserState);
+router.post('/ach_create_link_token', createACHLinkToken);
+router.post('/exchange_public_token', exchangePublicToken);
+router.post('/create_transfer', createTransferAuthorization);
 
 module.exports = router;
+
+
+
+
+

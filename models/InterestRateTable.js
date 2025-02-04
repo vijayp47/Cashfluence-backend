@@ -1,5 +1,5 @@
 const { sequelize } = require('../config/db'); 
-const { DataTypes } = require('sequelize');
+const { DataTypes, NUMBER } = require('sequelize');
 
 // Define the InterestRateTable model
 const InterestRateTable = sequelize.define('InterestRateTable', {
@@ -9,6 +9,10 @@ const InterestRateTable = sequelize.define('InterestRateTable', {
         unique: true,
         primaryKey: true,
     },
+    userid: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
     external_id: {
         type: DataTypes.STRING,
         allowNull: false,

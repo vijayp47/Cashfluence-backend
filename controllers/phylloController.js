@@ -13,8 +13,8 @@ const { Sequelize } = require('../config/db');
 const createPhylloUser = async (req, res) => {
   try {
     // Check if the user exists in the database
-    const { external_id } = req.body; // Assuming `external_id` is passed in the request body
-
+    const { external_id,login_id } = req.body; // Assuming `external_id` is passed in the request body
+   
     const existingUser = await InterestRateTable.findOne({
       where: { external_id },
     });
@@ -41,10 +41,12 @@ const createPhylloUser = async (req, res) => {
     });
 
     const userId = response.data?.id;
+    
     const externalId = response.data?.external_id;
     const name = response.data?.name;
 
     const resData = {
+      userid:login_id,
       user_id: userId,
       external_id: externalId,
       name: name,
@@ -570,10 +572,55 @@ const fetchDataFromdatabase = async (req, res) => {
   }
 };
 
+
+
+const fetchDataFromdatabaseAdmin = async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    // Check if required parameters are provided
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: messages?.REQUIRED_USER, // Ensure `messages?.REQUIRED_USER` is defined
+      });
+    }
+
+    // Fetch the account data for the given userId
+    const accountData = await InterestRateTable.findOne({
+      where: { userid: userId },
+    });
+
+    // Check if no account data was found for the user
+    if (!accountData) {
+      return res.status(200).json({
+        success: false,
+        message: `${messages?.ACCOUNT_DATA_ERROR}`,
+      });
+    } else {
+      // If account data is found, return it in the response
+      return res.status(200).json({
+        success: true,
+        accountData, // Send the account data as part of the response
+        message: `${messages?.ACCOUNT_DATA}`,
+      });
+    }
+  } catch (error) {
+    console.error(messages?.SOCIAL_ACCOUNT_ERROR, error);
+    return res.status(500).json({
+      success: false,
+      message: messages?.ERROR_SOCIAL_ACCOUNTS,
+      error: error.message,
+    });
+  }
+};
+
+
+
 const fetchStateLawFromDatabase = async (req, res) => {
   try {
     const { state, loan_term, loan_amount } = req.query;
-    // console.log(state,loan_term,loan_amount)
+
     // Validate input parameters
     if (!state || !loan_term || !loan_amount) {
       return res.status(400).json({
@@ -623,6 +670,7 @@ if (filteredData.length === 0) {
         message: "No matching data found for the given loan amount.",
       });
     }
+
     // Return the first matched result (or customize as needed)
     return res.status(200).json({
       success: true,
@@ -1006,7 +1054,8 @@ module.exports = {
   fetchanSocialAccount,
   fetchDataFromdatabase,
   deletePlatformData,
-  fetchStateLawFromDatabase
+  fetchStateLawFromDatabase,
+  fetchDataFromdatabaseAdmin
   // getContent,
   // getPublicationContent,
   // getComments,

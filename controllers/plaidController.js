@@ -1,16 +1,14 @@
-// Assuming you have already set up and initialized plaidClient like in the previous example
 const { plaidClient } = require("../config/plaidConfig");
-const User = require('../models/User');
-const PlaidUser = require('../models/PlaidUser');
-const { Account, Balances, Mortgage, StudentLoan } = require('../models/Plaid'); 
-const { sequelize } = require('../config/db');
-const riskService = require("../services/riskServices")
+const User = require("../models/User");
+const PlaidUser = require("../models/PlaidUser");
+const { Account, Balances, Mortgage, StudentLoan } = require("../models/Plaid");
+const { sequelize } = require("../config/db");
+const riskService = require("../services/riskServices");
 const TEMPLATE_ID = process.env.TEMPLATE_ID;
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
 const PLAID_SECRET = process.env.PLAID_SECRET;
 const PLAID_ENV = process.env.PLAID_ENV;
-console.log("TEMPLATE_ID",TEMPLATE_ID);
-
+console.log("TEMPLATE_ID", TEMPLATE_ID);
 
 // Function to create link token
 const createLinkToken = async (req, res) => {
@@ -64,7 +62,7 @@ const plaidPublicToken = async (req, res) => {
 
 const getLiabilities = async (req, res) => {
   const { accessToken } = req.body;
-  const userId = req?.query?.userId; 
+  const userId = req?.query?.userId;
 
   if (!accessToken) {
     return res.status(400).json({ error: "Access token is required" });
@@ -74,18 +72,20 @@ const getLiabilities = async (req, res) => {
     return res.status(400).json({ error: "User not found" });
   }
 
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
-    return res.status(401).json({ success: false, message: 'No token provided' });
+    return res
+      .status(401)
+      .json({ success: false, message: "No token provided" });
   }
-
 
   try {
     // Fetch liabilities from Plaid API
-    const response = await plaidClient.liabilitiesGet({ access_token: accessToken });
+    const response = await plaidClient.liabilitiesGet({
+      access_token: accessToken,
+    });
 
- 
     // Start a database transaction to ensure atomicity
     const transaction = await sequelize.transaction();
 
@@ -94,15 +94,14 @@ const getLiabilities = async (req, res) => {
       const { mortgage, student } = liabilities;
       const institutionName = item?.institution_name;
       const institutionId = item?.institution_id;
-       userId;
+      userId;
 
       // Upsert Account Data
       for (const accountData of accounts) {
-     
         await Account.upsert(
           {
             accountId: accountData.account_id,
-            accessToken, 
+            accessToken,
             mask: accountData.mask,
             name: accountData.name,
             officialName: accountData.official_name || null,
@@ -118,7 +117,6 @@ const getLiabilities = async (req, res) => {
 
         // Upsert Balances
         if (accountData.balances) {
-      
           await Balances.upsert(
             {
               accountId: accountData.account_id,
@@ -126,7 +124,8 @@ const getLiabilities = async (req, res) => {
               current: accountData.balances.current,
               isoCurrencyCode: accountData.balances.iso_currency_code,
               limit: accountData.balances.limit,
-              unofficialCurrencyCode: accountData.balances.unofficial_currency_code,
+              unofficialCurrencyCode:
+                accountData.balances.unofficial_currency_code,
               userId,
             },
             { transaction }
@@ -137,7 +136,6 @@ const getLiabilities = async (req, res) => {
       // Handle Mortgages
       if (mortgage) {
         for (const mortgageData of mortgage) {
-      
           await Mortgage.upsert(
             {
               accountId: mortgageData.account_id,
@@ -156,7 +154,8 @@ const getLiabilities = async (req, res) => {
               nextMonthlyPayment: mortgageData.next_monthly_payment,
               nextPaymentDueDate: mortgageData.next_payment_due_date,
               originationDate: mortgageData.origination_date,
-              originationPrincipalAmount: mortgageData.origination_principal_amount,
+              originationPrincipalAmount:
+                mortgageData.origination_principal_amount,
               pastDueAmount: mortgageData.past_due_amount,
               propertyAddress: mortgageData.property_address,
               ytdInterestPaid: mortgageData.ytd_interest_paid,
@@ -171,7 +170,6 @@ const getLiabilities = async (req, res) => {
       // Handle Student Loans
       if (student) {
         for (const studentData of student) {
-        
           await StudentLoan.upsert(
             {
               accountId: studentData.account_id,
@@ -190,8 +188,10 @@ const getLiabilities = async (req, res) => {
               minimumPaymentAmount: studentData.minimum_payment_amount,
               nextPaymentDueDate: studentData.next_payment_due_date,
               originationDate: studentData.origination_date,
-              originationPrincipalAmount: studentData.origination_principal_amount,
-              outstandingInterestAmount: studentData.outstanding_interest_amount,
+              originationPrincipalAmount:
+                studentData.origination_principal_amount,
+              outstandingInterestAmount:
+                studentData.outstanding_interest_amount,
               repaymentPlan: studentData.repayment_plan,
               servicerAddress: studentData.servicer_address,
               ytdInterestPaid: studentData.ytd_interest_paid,
@@ -207,33 +207,55 @@ const getLiabilities = async (req, res) => {
       await transaction.commit();
 
       const data = {
-        message: 'Liabilities data successfully saved',
+        message: "Liabilities data successfully saved",
         data: response?.data,
       };
       res.json(data);
     } catch (error) {
       // Rollback the transaction if something goes wrong
       await transaction.rollback();
-      console.error('Error saving data to the database:', error.message || error);
-      res.status(500).json({ error: "Error saving data to the database", details: error.message || error });
+      console.error(
+        "Error saving data to the database:",
+        error.message || error
+      );
+      res
+        .status(500)
+        .json({
+          error: "Error saving data to the database",
+          details: error.message || error,
+        });
     }
   } catch (error) {
-    console.error("Error fetching liabilities from Plaid:", error.response ? error.response.data : error.message);
-    res.status(500).json({ error: "An error occurred fetching liabilities", details: error.response ? error.response.data : error.message });
+    console.error(
+      "Error fetching liabilities from Plaid:",
+      error.response ? error.response.data : error.message
+    );
+    res
+      .status(500)
+      .json({
+        error: "An error occurred fetching liabilities",
+        details: error.response ? error.response.data : error.message,
+      });
   }
 };
 
 // Controller function to handle the risk score request
 const getRiskScoreController = async (req, res) => {
-
   try {
     const { accessTokens } = req.body; // Array of access tokens from the request body
     if (!Array.isArray(accessTokens) || accessTokens.length === 0) {
-      return res.status(400).json({ success: false, message: 'Access tokens are required and must be an array' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Access tokens are required and must be an array",
+        });
     }
-   const token = req.headers.authorization?.split(' ')[1];
-   if (!token) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: "No token provided" });
     }
 
     const results = [];
@@ -241,7 +263,9 @@ const getRiskScoreController = async (req, res) => {
     for (const accessToken of accessTokens) {
       try {
         // Fetch liabilities data from Plaid API
-        const response = await plaidClient.liabilitiesGet({ access_token: accessToken });
+        const response = await plaidClient.liabilitiesGet({
+          access_token: accessToken,
+        });
 
         const liabilitiesData = {
           credit: response?.data?.liabilities?.credit || [],
@@ -262,7 +286,10 @@ const getRiskScoreController = async (req, res) => {
           // liabilitiesData: response?.data, // Include the original liabilities data if needed
         });
       } catch (error) {
-        console.error(`Error fetching liabilities or calculating risk for token ${accessToken}:`, error);
+        console.error(
+          `Error fetching liabilities or calculating risk for token ${accessToken}:`,
+          error
+        );
         results.push({
           accessToken,
           error: "Error calculating risk score or fetching liabilities",
@@ -277,14 +304,13 @@ const getRiskScoreController = async (req, res) => {
     });
   } catch (error) {
     console.error("Error processing risk score calculations:", error);
-    res.status(500).json({ message: "Error processing risk score calculations", error });
+    res
+      .status(500)
+      .json({ message: "Error processing risk score calculations", error });
   }
 };
 
-
 const clearOldSessions = async (userId) => {
-  console.log("userid-----------------",userId);
-  
   try {
     await PlaidUser.update(
       { mostRecentIdvSession: null },
@@ -301,28 +327,24 @@ const idvPlaidToken = async (req, res, next) => {
     const { userId } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ message: 'Missing userId' });
+      return res.status(400).json({ message: "Missing userId" });
     }
 
     console.log(`Requesting IDV link token for userId: ${userId}`);
 
-
-   
-   
-
     // Generate the Plaid link token without the invalid `prefill` field
     const tokenResponse = await plaidClient.linkTokenCreate({
       user: { client_user_id: userId },
-      client_name: 'Cashfluence',
-      products: ['identity_verification'],
+      client_name: "Cashfluence",
+      products: ["identity_verification"],
       identity_verification: {
         template_id: TEMPLATE_ID, // Use the template ID
       },
-      country_codes: ['US'],
-      language: 'en',
+      country_codes: ["US"],
+      language: "en",
     });
 
-    console.log('Generated Plaid link token:', tokenResponse.data.link_token);
+    console.log("Generated Plaid link token:", tokenResponse.data.link_token);
 
     return res.json({
       link_token: tokenResponse.data.link_token,
@@ -336,15 +358,13 @@ const idvPlaidToken = async (req, res, next) => {
     next(error);
   }
 };
-
-
 const updateUserRecordForIDVSession = async (idvSession, userId) => {
   try {
     const plaidResponse = await plaidClient.identityVerificationGet({
       identity_verification_id: idvSession,
     });
 
-     const identityData = plaidResponse.data;
+    const identityData = plaidResponse.data;
 
     const {
       user,
@@ -358,13 +378,15 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
 
     // Construct a detailed address
     const fullAddress = [
-      user.address?.street || '',
-      user.address?.street2 || '',
-      user.address?.city || '',
-      user.address?.region || '',
-      user.address?.postal_code || '',
-      user.address?.country || '',
-    ].filter(Boolean).join(', ');
+      user.address?.street || "",
+      user.address?.street2 || "",
+      user.address?.city || "",
+      user.address?.region || "",
+      user.address?.postal_code || "",
+      user.address?.country || "",
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     // Compile KYC details
     const kycDetails = {
@@ -384,13 +406,14 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
     };
 
     // Compile documentary verification details
-    const documentaryVerificationDetails = documentary_verification?.documents.map((doc) => ({
-      status: doc.status,
-      attempt: doc.attempt,
-      images: doc.images,
-      extracted_data: doc.extracted_data,
-      analysis: doc.analysis,
-    }));
+    const documentaryVerificationDetails =
+      documentary_verification?.documents.map((doc) => ({
+        status: doc.status,
+        attempt: doc.attempt,
+        images: doc.images,
+        extracted_data: doc.extracted_data,
+        analysis: doc.analysis,
+      }));
 
     // Compile selfie check details
     const selfieCheckDetails = {
@@ -413,22 +436,26 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
       identity_abuse_signals: risk_check?.identity_abuse_signals,
     };
 
+    console.log(
+      "documentaryVerificationDetails",
+      documentaryVerificationDetails
+    );
+    console.log("riskCheckDetails", riskCheckDetails);
+    console.log("selfieCheckDetails", selfieCheckDetails);
 
-    console.log("documentaryVerificationDetails",documentaryVerificationDetails);
-    console.log("riskCheckDetails",riskCheckDetails);
-    console.log("selfieCheckDetails",selfieCheckDetails);
-    
     // Check if user exists in the database
     const userExists = await PlaidUser.findOne({ where: { user_id: userId } });
 
     if (!userExists) {
-      console.error(`User with user_id ${userId} does not exist. Creating a new record.`);
+      console.error(
+        `User with user_id ${userId} does not exist. Creating a new record.`
+      );
 
       // Create a new record
       const newUser = await PlaidUser.create({
         user_id: userId,
-        first_name: user.name?.given_name || 'Unknown',
-        last_name: user.name?.family_name || 'Unknown',
+        first_name: user.name?.given_name || "Unknown",
+        last_name: user.name?.family_name || "Unknown",
         dob: user.date_of_birth || null,
         address: fullAddress,
         phone_number: user.phone_number || null,
@@ -456,8 +483,8 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
     console.log("Updating record for userId:", userId);
     const updateStatus = await PlaidUser.update(
       {
-        first_name: user.name?.given_name || 'Unknown',
-        last_name: user.name?.family_name || 'Unknown',
+        first_name: user.name?.given_name || "Unknown",
+        last_name: user.name?.family_name || "Unknown",
         dob: user.date_of_birth || null,
         address: fullAddress,
         phone_number: user.phone_number || null,
@@ -479,33 +506,34 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
     console.log("Update Status:", updateStatus);
 
     // Return a standardized response indicating success
-    return { created: false, updated: updateStatus[0] > 0,status };
+    return { created: false, updated: updateStatus[0] > 0, status };
   } catch (error) {
-    console.error('Error updating user record for IDV session:', error);
-    throw new Error('Failed to update user record');
+    console.error("Error updating user record for IDV session:", error);
+    throw new Error("Failed to update user record");
   }
 };
-
 
 const plaidIDVComplete = async (req, res, next) => {
   try {
     const { metadata, userId } = req.body;
 
     if (!metadata?.link_session_id) {
-      return res.status(400).json({ message: 'Missing IDV session ID' });
+      return res.status(400).json({ message: "Missing IDV session ID" });
     }
 
     // Update user record with the IDV session data
-    const sessionStatus = await updateUserRecordForIDVSession(metadata.link_session_id, userId);
-    console.log("sessionStatus----------", sessionStatus);
+    const sessionStatus = await updateUserRecordForIDVSession(
+      metadata.link_session_id,
+      userId
+    );
 
     // Handle user creation and update cases
     if (sessionStatus?.created && sessionStatus?.status === "success") {
       console.log(`New user created with userId: ${userId}`);
-      return res.json({ message: 'User created successfully.' });
+      return res.json({ message: "User created successfully." });
     }
-    if(sessionStatus?.status == "failed"){
-      return res.status(500).json({ message: 'Verification failed.' });
+    if (sessionStatus?.status == "failed") {
+      return res.status(500).json({ message: "Verification failed." });
     }
 
     if (sessionStatus?.updated) {
@@ -514,25 +542,23 @@ const plaidIDVComplete = async (req, res, next) => {
       // Check if the user still needs to complete verification
       const user = await PlaidUser.findOne({ where: { user_id: userId } });
 
-      if (user.plaid_idv_status !== 'success') {
-        return res.json({ message: 'Verification is incomplete.' });
-      } else if (user.plaid_idv_status === 'failed') {
+      if (user.plaid_idv_status !== "success") {
+        return res.json({ message: "Verification is incomplete." });
+      } else if (user.plaid_idv_status === "failed") {
         // IDV failed, return 500 error
-        return res.status(500).json({ message: 'Verification failed.' });
+        return res.status(500).json({ message: "Verification failed." });
       } else {
-        return res.json({ message: 'User already verified.' });
+        return res.json({ message: "User already verified." });
       }
     }
 
     // If no rows were updated and no user was created
-    // return res.status(500).json({ message: 'Internal server error' });
-    return res.status(200).json({ message: 'Plaid Idv Complete Successfully' });
+    return res.status(500).json({ message: "Internal server error" });
   } catch (error) {
-    console.error('Error in Plaid IDV complete:', error);
-    next(error);  // Forward to error handling middleware
+    console.error("Error in Plaid IDV complete:", error);
+    next(error); // Forward to error handling middleware
   }
 };
-
 
 const getPlaidUserData = async (req, res) => {
   try {
@@ -563,7 +589,69 @@ const getPlaidUserData = async (req, res) => {
   }
 };
 
-const PlaidResetIdv= async (req, res) => {
+const getPlaidUserState = async (req, res) => {
+  try {
+    // Extract user_id from request query or body
+    const { user_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ message: "user_id is required" });
+    }
+
+    // Fetch the user record
+    const plaidUser = await PlaidUser.findOne({
+      where: { user_id },
+    });
+
+    if (!plaidUser) {
+      return res.status(200).json({
+        message:
+          "Plaid User not found. Please complete identity verification and KYC on the profile page.",
+      });
+    }
+
+    // Extract the address from the user's data
+    const { address } = plaidUser;
+
+    if (!address) {
+      return res.status(200).json({
+        message:
+          "Address not found for the user. Please complete your profile.",
+      });
+    }
+
+    // Parse the address to extract the state
+    const addressParts = address.split(",").map((part) => part.trim());
+
+    // Ensure the address has enough parts to contain a state
+    if (addressParts.length >= 4) {
+      // The state is typically the third-to-last part in the address
+      const state = addressParts[addressParts.length - 3]; // The part that should contain the state
+
+      // If the state is a two-letter abbreviation, return it
+      if (state && state.length === 2) {
+        return res.status(200).json({
+          message: "State retrieved successfully",
+          state,
+        });
+      } else {
+        return res.status(200).json({
+          message:
+            "State not found or invalid format. Please verify your address.",
+        });
+      }
+    } else {
+      return res.status(200).json({
+        message: "Invalid address format. Please verify your address.",
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching Plaid user data:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const PlaidResetIdv = async (req, res) => {
   const { client_user_id } = req.body;
 
   try {
@@ -573,12 +661,11 @@ const PlaidResetIdv= async (req, res) => {
 
     console.log("Retrying IDV for client_user_id:", client_user_id);
 
-    const request = { 
+    const request = {
       client_user_id: client_user_id,
       template_id: TEMPLATE_ID,
-      strategy: 'reset',
-
-     };
+      strategy: "reset",
+    };
 
     const response = await plaidClient.identityVerificationRetry(request);
 
@@ -589,7 +676,10 @@ const PlaidResetIdv= async (req, res) => {
       data: response.data,
     });
   } catch (error) {
-    console.error("Error retrying identity verification:", error.response?.data || error.message);
+    console.error(
+      "Error retrying identity verification:",
+      error.response?.data || error.message
+    );
     res.status(500).json({ message: "Failed to retry identity verification" });
   }
 };
@@ -607,7 +697,7 @@ const getpliadUserIdvStauts = async (req, res) => {
     const plaidUser = await PlaidUser.findOne({
       where: { user_id },
     });
-    console.log("plaiduser....",plaidUser)
+    console.log("plaiduser....", plaidUser);
 
     if (!plaidUser) {
       return res.status(200).json({ message: "Plaid User not found" });
@@ -624,9 +714,8 @@ const getpliadUserIdvStauts = async (req, res) => {
   }
 };
 
-const getUserDataFromDatabase = async(user_id) =>{
+const getUserDataFromDatabase = async (user_id) => {
   try {
-  
     if (!user_id) {
       return res.status(400).json({ message: "user_id is required" });
     }
@@ -642,16 +731,16 @@ const getUserDataFromDatabase = async(user_id) =>{
     }
 
     // Send the detailed user data
-    return userData
+    return userData;
   } catch (error) {
     console.error("Error fetching user data:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
 //prefill_idv_data
-const prefillUserData =  async (req, res, next) => {
-  const { userId } = req.body; 
+const prefillUserData = async (req, res, next) => {
+  const { userId } = req.body;
   try {
     const getUserData = await getUserDataFromDatabase(userId); // Fetch user data from your databas
     const response = await plaidClient.identityVerificationCreate({
@@ -660,7 +749,10 @@ const prefillUserData =  async (req, res, next) => {
       is_idempotent: true,
       user: {
         client_user_id: userId,
-        name: { family_name: getUserData.firstName, given_name: getUserData.lastName },
+        name: {
+          family_name: getUserData.firstName,
+          given_name: getUserData.lastName,
+        },
         // address: {
         //   street: userData.street,
         //   city: userData.city,
@@ -674,17 +766,16 @@ const prefillUserData =  async (req, res, next) => {
     });
 
     const idvSession = response.data.id;
-    console.log(response.data)
+    console.log(response.data);
     const updatedData = await updateLatestIDVSession(userId, idvSession);
-    return updatedData
+    return updatedData;
   } catch (error) {
     next(error);
   }
-}
+};
 
 const updateLatestIDVSession = async (user_id, idvSession) => {
   try {
-
     if (!user_id || !idvSession) {
       return "user_id and idvSession are required";
     }
@@ -697,11 +788,11 @@ const updateLatestIDVSession = async (user_id, idvSession) => {
 
     if (result[0] === 0) {
       // No rows were updated
-      return  "Plaid User not found or no changes made" ;
+      return "Plaid User not found or no changes made";
     }
 
     // Respond with success
-    return result
+    return result;
   } catch (error) {
     console.error("Error updating IDV session:", error);
   }
@@ -730,15 +821,6 @@ const updateLatestIDVSession = async (user_id, idvSession) => {
 //   }
 // };
 
-
-
-
-
-
-
-
-
-
 //   const RecentIdvSession = async (req, res, next) => {
 //   try {
 //     const userId = getLoggedInUserId(req);
@@ -749,12 +831,13 @@ const updateLatestIDVSession = async (user_id, idvSession) => {
 //   }
 // };
 
-
 const getTransactions = async (req, res) => {
   const { accessToken, startDate, endDate } = req.body;
 
   if (!accessToken || !startDate || !endDate) {
-    return res.status(400).json({ error: "Access token, start date, and end date are required" });
+    return res
+      .status(400)
+      .json({ error: "Access token, start date, and end date are required" });
   }
 
   try {
@@ -763,7 +846,7 @@ const getTransactions = async (req, res) => {
       start_date: startDate,
       end_date: endDate,
     });
-  
+
     res.json(response.data);
   } catch (error) {
     console.error(
@@ -773,7 +856,6 @@ const getTransactions = async (req, res) => {
     res.status(500).json({ error: "An error occurred fetching transactions" });
   }
 };
-
 
 const getUserAccountData = async (req, res) => {
   const userId = req.query.userId;
@@ -787,43 +869,60 @@ const getUserAccountData = async (req, res) => {
     const accounts = await Account.findAll({
       where: { userId },
       attributes: [
-        'accountId',
-        'mask',
-        'name',
-        'officialName',
-        'persistentAccountId',
-        'subtype',
-        'type',
-        'institution_name',
-        'institution_id',
-        'accessToken'
+        "accountId",
+        "mask",
+        "name",
+        "officialName",
+        "persistentAccountId",
+        "subtype",
+        "type",
+        "institution_name",
+        "institution_id",
+        "accessToken",
       ],
     });
 
     if (!accounts.length) {
-      return res.status(404).json({ message: 'No accounts found for the given user.' });
+      return res
+        .status(404)
+        .json({ message: "No accounts found for the given user." });
     }
 
     // Collect account data with related information (balances, mortgages, loans)
     const accountData = await Promise.all(
       accounts.map(async (account) => {
-        
         const accountId = account.accountId;
 
         // Fetch related data for each account
         const balances = await Balances.findOne({
           where: { accountId, userId },
-          attributes: ['available', 'current', 'isoCurrencyCode', 'limit', 'unofficialCurrencyCode'],
+          attributes: [
+            "available",
+            "current",
+            "isoCurrencyCode",
+            "limit",
+            "unofficialCurrencyCode",
+          ],
         });
 
         const mortgage = await Mortgage.findOne({
           where: { accountId, userId },
-          attributes: ['accountNumber', 'interestRatePercentage', 'nextPaymentDueDate', 'loanTypeDescription'],
+          attributes: [
+            "accountNumber",
+            "interestRatePercentage",
+            "nextPaymentDueDate",
+            "loanTypeDescription",
+          ],
         });
 
         const studentLoan = await StudentLoan.findOne({
           where: { accountId, userId },
-          attributes: ['loanName', 'minimumPaymentAmount', 'nextPaymentDueDate', 'outstandingInterestAmount'],
+          attributes: [
+            "loanName",
+            "minimumPaymentAmount",
+            "nextPaymentDueDate",
+            "outstandingInterestAmount",
+          ],
         });
 
         // Return simplified account object
@@ -839,7 +938,7 @@ const getUserAccountData = async (req, res) => {
           studentLoan: studentLoan || null,
           institution_name: account.institution_name,
           institution_id: account.institution_id,
-          accessToken:account.accessToken
+          accessToken: account.accessToken,
         };
       })
     );
@@ -852,7 +951,7 @@ const getUserAccountData = async (req, res) => {
         result[key] = {
           institution_name: account.institution_name,
           institution_id: account.institution_id,
-          accessToken:account.accessToken,
+          accessToken: account.accessToken,
           accounts: [],
         };
       }
@@ -867,7 +966,6 @@ const getUserAccountData = async (req, res) => {
         balances: account.balances,
         mortgage: account.mortgage,
         studentLoan: account.studentLoan,
-      
       });
 
       return result;
@@ -879,82 +977,26 @@ const getUserAccountData = async (req, res) => {
     // Send the grouped response
     return res.status(200).json(response);
   } catch (error) {
-    console.error('Error fetching user data:', error);
-    return res.status(500).json({ message: 'Failed to fetch user data.', error: error.message });
+    console.error("Error fetching user data:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch user data.", error: error.message });
   }
-};
-
-const getPlaidUserState = async (req, res) => {
-  try {
-    // Extract user_id from request query or body
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      return res.status(400).json({ message: "user_id is required" });
-    }
-
-    // Fetch the user record
-    const plaidUser = await PlaidUser.findOne({
-      where: { user_id },
-    });
-
-    if (!plaidUser) {
-      return res.status(200).json({
-        message: "Plaid User not found. Please complete identity verification and KYC on the profile page.",
-      });
-    }
-
-    // Extract the address from the user's data
-    const { address } = plaidUser;
-
-    if (!address) {
-      return res.status(200).json({
-        message: "Address not found for the user. Please complete your profile.",
-      });
-    }
-
-    // Parse the address to extract the state
-    const addressParts = address.split(',').map((part) => part.trim());
-    
-    // Ensure the address has enough parts to contain a state
-    if (addressParts.length >= 4) {
-      // The state is typically the third-to-last part in the address
-      const state = addressParts[addressParts.length - 3]; // The part that should contain the state
-
-      // If the state is a two-letter abbreviation, return it
-      if (state && state.length === 2) {
-        return res.status(200).json({
-          message: "State retrieved successfully",
-          state,
-        });
-      } else {
-        return res.status(200).json({
-          message: "State not found or invalid format. Please verify your address.",
-        });
-      }
-    } else {
-      return res.status(200).json({
-        message: "Invalid address format. Please verify your address.",
-      });
-    }
-  } catch (error) {
-    console.error("Error fetching Plaid user data:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-const testVercel = async (req, res) => {
-  res.status(201).json({ success: true, data: "Hello, this is for testing purpose" });
 };
 
 module.exports = {
   createLinkToken,
   plaidPublicToken,
-  getLiabilities,getpliadUserIdvStauts,
-  getTransactions,getUserAccountData,
-  getRiskScoreController,idvPlaidToken,
-  plaidIDVComplete,clearOldSessions,
-  getPlaidUserData,PlaidResetIdv,
-  prefillUserData,getPlaidUserState,
-  testVercel
+  getLiabilities,
+  getpliadUserIdvStauts,
+  getTransactions,
+  getUserAccountData,
+  getRiskScoreController,
+  idvPlaidToken,
+  plaidIDVComplete,
+  clearOldSessions,
+  getPlaidUserData,
+  PlaidResetIdv,
+  prefillUserData,
+  getPlaidUserState,
 };
