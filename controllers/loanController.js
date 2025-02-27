@@ -489,7 +489,7 @@ const sendDueDateReminderEmail = async (
 
     if (daysLeft <= 0 ) {
       subject = `Loan EMI #${emiNo} Payment Due Today – Loan #${loanId}`;
-    if(!isPaid){
+if(!isPaid){
       message += `
       <p><strong>Your EMI payment is due today! Please make the payment as soon as possible to avoid penalties.</strong></p>
       <p><strong>Important:</strong> If the payment is not made by the due date, i.e., <strong>${dueDate}</strong>, a late fee of <strong>$50</strong> will be applied to your loan.</p>

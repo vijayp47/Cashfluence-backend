@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Failed</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            background-color: #f8d7da; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container { 
+            max-width: 420px;
+            background: white;
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        h1 { 
+            color: #d32f2f; 
+            font-size: 28px; 
+            margin-bottom: 10px;
+        }
+        p { 
+            font-size: 17px; 
+            color: #555; 
+            margin: 15px 0;
+        }
+        .retry-btn { 
+            display: inline-block; 
+            text-decoration: none; 
+            background: #ff5733; 
+            color: white; 
+            padding: 12px 24px; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(255, 87, 51, 0.2);
+        }
+        .retry-btn:hover { 
+            background: #c70039;
+            transform: scale(1.05);
+        }
+        .icon {
+            font-size: 60px;
+            color: #d32f2f;
+            margin-bottom: 15px;
+        }
+    </style>
+    <script>
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get("session_id");
+            const loanId = urlParams.get("loan_id");
+            const emiAmount = urlParams.get("emi_amount"); 
+            const user_id = urlParams.get("user_id"); 
+
+            const retryButton = document.getElementById("retry-button");
+            if (sessionId && loanId && emiAmount) {
+                retryButton.href = `http://localhost:3000/retry-payment?session_id=${sessionId}&loan_id=${loanId}&emiAmount=${emiAmount}&user_id=${user_id}`;
+                retryButton.style.display = "inline-block"; 
+            } else {
+                retryButton.style.display = "none"; 
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">❌</div>
+        <h1>Payment Failed</h1>
+        <p>Oops! Your payment could not be processed. Please try again.</p>
+        <a id="retry-button" href="#" class="retry-btn">Retry Payment</a>
+    </div>
+</body>
+</html>
