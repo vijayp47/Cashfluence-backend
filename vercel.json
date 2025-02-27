@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm install pg && npm run build",
     "version": 2,
     "builds": [
       {
