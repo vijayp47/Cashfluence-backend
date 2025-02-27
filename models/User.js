@@ -110,8 +110,8 @@
 // module.exports = User;
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-
 const { Account } = require('../models/Plaid');
+
 // Define the User model
 const User = sequelize.define('User', {
   firstName: {
@@ -159,22 +159,31 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true, // Allow storing image file paths or URLs
   },
+  hasPaidForVerification: {  // column to track verification payment status
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false // Default is false, meaning user hasn't paid
+  },
 });
 
-// One-to-many relationship: A User can have many Accounts
+
 User.hasMany(Account, {
   foreignKey: {
-    name: 'userId',  // Reference key for User in Account model
+    name: 'userId',
     allowNull: false,
-  }
+  },
+  onDelete: 'CASCADE' // ✅ Ensure accounts are deleted when user is deleted
 });
 
 Account.belongsTo(User, {
   foreignKey: {
-    name: 'userId',  // Foreign key for Account pointing to User
+    name: 'userId',
     allowNull: false,
-  }
-
+  },
+  onDelete: 'CASCADE' // ✅ Ensure referential integrity
 });
+
+
+
 
 module.exports = User;

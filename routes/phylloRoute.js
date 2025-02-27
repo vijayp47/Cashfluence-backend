@@ -12,7 +12,6 @@ router.get('/platforms',authenticateUser, fetchPhylloPlatforms);
 router.get('/social/accounts',authenticateUser, fetchanSocialAccount);
 router.get('/fetchDataFromdatabase',authenticateUser, fetchDataFromdatabase);
 router.get('/fetchDataFromdatabaseadmin',authenticateAdmin, fetchDataFromdatabaseAdmin);
-
 router.delete('/deletePlatformData', authenticateUser,deletePlatformData);
 router.get('/fetchStateAnnualPercentageRate', authenticateUser,fetchStateLawFromDatabase);
 // router.get('/risk-score',authenticateUser,getRiskScore);

@@ -1,4 +1,3 @@
-// models/Loan.js
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 const User = require('./User');  // Ensure User model is correctly defined
@@ -23,10 +22,10 @@ const Loan = sequelize.define('Loan', {
   },
   interest: {
     type: DataTypes.DECIMAL(5, 2),
-    allowNull: true, // Or false, depending on your requirement
+    allowNull: true,
   },
-  loanrequested: {  // Change this to match what you are passing
-    type: DataTypes.BOOLEAN, // Assuming you want to store a boolean value
+  loanrequested: {
+    type: DataTypes.BOOLEAN, 
     allowNull: false,
     defaultValue: false,
   },
@@ -38,17 +37,25 @@ const Loan = sequelize.define('Loan', {
     type: DataTypes.DECIMAL(5, 2),
     allowNull: true,
   },
-  fromAccount:{
+  fromAccount: {
     type: DataTypes.JSONB, // Store bank-related data as JSON
     allowNull: true,
   },
-  toAccount:{
-    type: DataTypes.JSONB, // Store bank-related data as JSON
+  toAccount: {
+    type: DataTypes.JSONB,
     allowNull: true,
-  }
-
+  },
+  isLoanComplete: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  dueDate: { //  New column for next due date
+    type: DataTypes.DATE,
+    allowNull: true, // Can be null if loan is not approved yet
+  },
 }, {
-  timestamps: true, // If you want Sequelize to automatically manage createdAt/updatedAt
+  timestamps: true, // Sequelize will auto-manage createdAt/updatedAt
 });
 
 // Association with User model

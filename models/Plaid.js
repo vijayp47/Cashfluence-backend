@@ -278,6 +278,51 @@ const StudentLoan = sequelize.define('StudentLoan', {
   }
 });
 
+const Credit = sequelize.define('Credit', {
+  accountId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    primaryKey: true, // Ensure unique account
+  },
+  aprs: {
+    type: DataTypes.JSONB, // Store array of APR data as JSON
+    allowNull: true,
+  },
+  isOverdue: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+  },
+  lastPaymentAmount: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+  },
+  lastPaymentDate: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+  lastStatementBalance: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+  },
+  lastStatementIssueDate: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+  minimumPaymentAmount: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+  },
+  nextPaymentDueDate: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  }
+});
+
+
 // Relationships
 Account.hasOne(Balances, { 
     foreignKey: {
@@ -291,6 +336,22 @@ Account.hasOne(Balances, {
     foreignKey: { 
       name: 'accountId', 
       type: DataTypes.STRING, // Define accountId as STRING in Balances
+      allowNull: false,
+    } 
+  });
+  Account.hasOne(Credit, { 
+    foreignKey: { 
+      name: 'accountId', 
+      type: DataTypes.STRING,  // Define accountId as STRING in Credit
+      allowNull: false,
+    }, 
+    onDelete: 'CASCADE' 
+  });
+  
+  Credit.belongsTo(Account, { 
+    foreignKey: { 
+      name: 'accountId', 
+      type: DataTypes.STRING,  // Define accountId as STRING in Credit
       allowNull: false,
     } 
   });
@@ -326,6 +387,13 @@ Account.hasOne(Balances, {
       allowNull: false,
     } 
   });
+
+  Account.addHook('beforeDestroy', async (account) => {
+    await Balances.destroy({ where: { accountId: account.accountId } });
+    await Mortgage.destroy({ where: { accountId: account.accountId } });
+    await StudentLoan.destroy({ where: { accountId: account.accountId } });
+    await Credit.destroy({ where: { accountId: account.accountId } });
+  });
   
 
-module.exports = { Account, Balances, Mortgage, StudentLoan };
+module.exports = { Account, Balances, Mortgage, StudentLoan,Credit };

@@ -9,7 +9,7 @@ const createACHLinkToken = async (req, res) => {
         client_user_id: '789',
       },
       client_name: 'Cashfluence',
-      products: ['auth', 'transfer'],
+      products: ['auth', 'transfer',"transactions"],
       country_codes: ['US'],
       language: 'en',
     });
@@ -42,7 +42,7 @@ const createTransferAuthorization = async (req, res) => {
       ach_class: 'ppd',
       user: {
         legal_name: 'John Doe',
-        email_address: 'mailto:johndoe@example.com',
+        email_address: 'johndoe@example.com',
       },
     });
     res.json(response.data);

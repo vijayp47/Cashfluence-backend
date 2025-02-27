@@ -2,12 +2,15 @@
 const User = require('../models/User');
 const Admin = require("../models/Admin");
 const Loan = require('../models/Loan');
+const PlaidUser = require("../models/PlaidUser");
+const Transaction = require("../models/Transaction");
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const messages = require('../constants/Messages');
 const nodemailer = require("nodemailer");
 const crypto = require('crypto');
 const { Op,literal,Sequelize } = require("sequelize");
+const { sequelize } = require("../config/db");
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
@@ -77,6 +80,87 @@ const createAdmin = async () => {
   }
 };
 
+
+const AdminGraphLoanDetails = async (req, res) => {
+  try {
+    // Count loan statuses
+    const approvedCount = await Loan.count({ where: { status: "Approved" } });
+    const pendingCount = await Loan.count({ where: { status: "Pending" } });
+    const rejectedCount = await Loan.count({ where: { status: "Rejected" } });
+
+    // Sum total loan and repaid amount
+    const totalLoanAmount = await Loan.sum("amount");
+    const repaidAmount = await Loan.sum("amount", { where: { isLoanComplete: true } });
+
+    // Count completed and incomplete loans
+    const completedLoans = await Loan.count({ where: { isLoanComplete: true } });
+    const incompleteLoans = await Loan.count({ where: { isLoanComplete: false } });
+
+    const data = {
+    loanApplicationStatus: [
+      { name: "Approved", value: approvedCount },
+      { name: "Pending", value: pendingCount },
+      { name: "Rejected", value: rejectedCount },
+    ],
+    loanAmountData: [
+      { name: "Total Loan", amount: totalLoanAmount || 0 },
+      { name: "Repaid Amount", amount: repaidAmount || 0 },
+    ],
+    loanCompletionData: [
+      { name: "Completed Loans", value: completedLoans },
+      { name: "Incomplete Loans", value: incompleteLoans },
+    ],
+  }
+    res.json({
+      success:true,
+      data:data
+    });
+  } catch (error) {
+    console.error("Error fetching loan stats:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+const AdminTransactionGraphData = async (req, res) => {
+  try {
+    // Monthly transactions
+    const monthlyTransactions = await Transaction.findAll({
+      attributes: [
+        [sequelize.fn("DATE_TRUNC", "month", sequelize.col("payment_date")), "month"],
+        [sequelize.fn("SUM", sequelize.col("amount")), "totalAmount"],
+      ],
+      group: ["month"],
+      order: [["month", "ASC"]],
+    });
+
+    // Yearly transactions
+    const yearlyTransactions = await Transaction.findAll({
+      attributes: [
+        [sequelize.fn("DATE_TRUNC", "year", sequelize.col("payment_date")), "year"],
+        [sequelize.fn("SUM", sequelize.col("amount")), "totalAmount"],
+      ],
+      group: ["year"],
+      order: [["year", "ASC"]],
+    });
+    const data = {
+      monthlyTransactions: monthlyTransactions.map((t) => ({
+        date: t.getDataValue("month"),
+        totalAmount: parseFloat(t.getDataValue("totalAmount")),
+      })),
+      yearlyTransactions: yearlyTransactions.map((t) => ({
+        date: t.getDataValue("year"),
+        totalAmount: parseFloat(t.getDataValue("totalAmount")),
+      })),
+    }
+    res.json({
+      success:true,
+      data:data
+    });
+  } catch (error) {
+    console.error("Error fetching transaction stats:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
 
 const adminLogin = async (req, res) => {
   const { email, password } = req.body;
@@ -573,173 +657,8 @@ const getAdminProfile = async (req, res) => {
   }
 };
 
-const getAllUsersWithLoans = async (req, res) => {
-  try {
-    const { page = 1, limit = 10, searchQuery } = req.query;
 
-    const offset = (page - 1) * limit;
-    const searchQueryDecoded = searchQuery
-      ? decodeURIComponent(searchQuery).trim()
-      : null;
 
-    const isLoanIdSearch = searchQueryDecoded && !isNaN(searchQueryDecoded);
-
-    // User search conditions (first name, last name, email)
-    const userWhereConditions = isLoanIdSearch
-      ? {} // If searching by loan ID, no need for user filters
-      : searchQueryDecoded
-      ? {
-          [Op.or]: [
-            { firstName: { [Op.iLike]: `%${searchQueryDecoded}%` } },
-            { lastName: { [Op.iLike]: `%${searchQueryDecoded}%` } },
-            { email: { [Op.iLike]: `%${searchQueryDecoded}%` } },
-            Sequelize.literal(
-              `CONCAT("firstName", ' ', "lastName") ILIKE '%${searchQueryDecoded}%'`
-            ),
-          ],
-        }
-      : {};
-
-    // Loan search conditions (EXACT loan ID match)
-    const loanWhereConditions = isLoanIdSearch
-      ? { id: { [Op.eq]: searchQueryDecoded } }
-      : {};
-
-    // Query users with loan conditions
-    const users = await User.findAndCountAll({
-      where: userWhereConditions,
-      limit: parseInt(limit),
-      offset,
-      include: [
-        {
-          model: Loan,
-          as: "loans",
-          where: loanWhereConditions, // Only apply loan filter when searching by ID
-          attributes: ["id", "amount","riskLevel","riskScore", "status", "fromAccount", "toAccount"],
-          required: isLoanIdSearch, // Inner join when loan ID is provided
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-    });
-    res.json({
-      success: true,
-      users: users.rows,
-      totalItems: users.count,
-      totalPages: Math.ceil(users.count / limit),
-      currentPage: page,
-    });
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch users",
-      error: error.message,
-    });
-  }
-};
-
-const getUsersWithLoans = async (req, res) => {
-  try {
-    const {
-      page = 1,
-      loanStatus,
-      loanMinAmount,
-      loanMaxAmount,
-      accountNumber,
-      institutionName,
-      accountName,
-      searchQuery, // Includes Loan ID or user search query
-    } = req.query;
-
-    const usersPerPage = 10;
-    const offset = (page - 1) * usersPerPage;
-
-    // Step 1: Loan-Specific Filters
-    let loanFilter = {};
-
-    if (loanStatus) loanFilter.status = loanStatus;
-
-    if (loanMinAmount && loanMaxAmount) {
-      loanFilter.amount = { [Op.between]: [loanMinAmount, loanMaxAmount] };
-    }
-
-    const accountFilters = {};
-    if (accountNumber) accountFilters.accountNumber = { [Op.iLike]: `%${accountNumber}%` };
-    if (institutionName) accountFilters.institutionName = { [Op.iLike]: `%${institutionName}%` };
-    if (accountName) accountFilters.accountName = { [Op.iLike]: `%${accountName}%` };
-
-    if (Object.keys(accountFilters).length > 0) {
-      loanFilter[Op.or] = [
-        { fromAccount: accountFilters },
-        { toAccount: accountFilters },
-      ];
-    }
-
-    // Step 2: Handle Loan ID or Search Query
-    let userWhereCondition = {};
-    let loanIdFilter = {}; // Loan ID-specific filter
-
-    if (searchQuery) {
-      if (!isNaN(searchQuery)) {
-        // If searchQuery is numeric, treat it as Loan ID
-        loanIdFilter.id = searchQuery;
-      } else {
-        // Otherwise, search in user-related fields
-        userWhereCondition[Op.or] = [
-          { firstName: { [Op.iLike]: `%${searchQuery}%` } },
-          { lastName: { [Op.iLike]: `%${searchQuery}%` } },
-          { email: { [Op.iLike]: `%${searchQuery}%` } },
-          Sequelize.literal(`CONCAT("firstName", ' ', "lastName") ILIKE '%${searchQuery}%'`),
-        ];
-      }
-    }
-
-    // Step 3: Fetch Loans (with Loan ID Filter if provided)
-    let loanUserIds = [];
-    if (Object.keys(loanFilter).length > 0 || Object.keys(loanIdFilter).length > 0) {
-      const loans = await Loan.findAll({
-        attributes: ["userId"],
-        where: { ...loanFilter, ...loanIdFilter },
-        group: ["userId"],
-      });
-      loanUserIds = loans.map((loan) => loan.userId);
-    }
-
-    // Step 4: Combine User Filters and Loan Filters
-    if (loanUserIds.length > 0) {
-      userWhereCondition.id = { [Op.in]: loanUserIds };
-    }
-
-    // Step 5: Fetch Filtered Users with Loans
-    const users = await User.findAndCountAll({
-      where: userWhereCondition,
-      include: [
-        {
-          model: Loan,
-          as: "loans",
-          where: { ...loanFilter, ...loanIdFilter },
-          required: Object.keys(loanFilter).length > 0 || Object.keys(loanIdFilter).length > 0,
-        },
-      ],
-      limit: usersPerPage,
-      offset,
-      order: [["createdAt", "DESC"]],
-    });
-
-    // Step 6: Return Paginated Results
-    const totalPages = Math.ceil(users.count / usersPerPage);
-    console.log(users.rows)
-    res.json({
-      success: true,
-      users: users.rows,
-      totalPages,
-      currentPage: parseInt(page),
-    });
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch users" });
-  }
-};
 
 
 const getFilterData = async (req, res) => {
@@ -823,6 +742,8 @@ const getUserDataForStatus = async(req,res) =>{
             'riskLevel',
             'riskScore',
             'loanrequested',
+            'isLoanComplete',
+            "dueDate",
             'createdAt',
           ], // Include only the necessary fields
         },
@@ -852,12 +773,217 @@ const getUserDataForStatus = async(req,res) =>{
   }
 }
 
+const getUsersWithLoans = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      loanStatus,
+      loanMinAmount,
+      loanMaxAmount,
+      accountNumber,
+      institutionName,
+      accountName,
+      searchQuery,
+    } = req.query;
+
+    const usersPerPage = 10;
+    const offset = (page - 1) * usersPerPage;
+
+    let loanFilter = {};
+    if (loanStatus) loanFilter.status = loanStatus;
+    if (loanMinAmount && loanMaxAmount) {
+      loanFilter.amount = { [Op.between]: [loanMinAmount, loanMaxAmount] };
+    }
+
+    let userWhereCondition = {};
+    let loanIdFilter = {};
+
+    if (searchQuery) {
+      if (!isNaN(searchQuery)) {
+        loanIdFilter.id = searchQuery;
+      } else {
+        userWhereCondition[Op.or] = [
+          { firstName: { [Op.iLike]: `%${searchQuery}%` } },
+          { lastName: { [Op.iLike]: `%${searchQuery}%` } },
+          { email: { [Op.iLike]: `%${searchQuery}%` } },
+          Sequelize.literal(`CONCAT("firstName", ' ', "lastName") ILIKE '%${searchQuery}%'`),
+        ];
+      }
+    }
+
+    let loanUserIds = [];
+    if (Object.keys(loanFilter).length > 0 || Object.keys(loanIdFilter).length > 0) {
+      const loans = await Loan.findAll({
+        attributes: ["userId"],
+        where: { ...loanFilter, ...loanIdFilter },
+        group: ["userId"],
+      });
+      loanUserIds = loans.map((loan) => loan.userId);
+    }
+
+    if (loanUserIds.length > 0) {
+      userWhereCondition.id = { [Op.in]: loanUserIds };
+    }
+
+    const users = await User.findAndCountAll({
+      where: userWhereCondition,
+      include: [
+        {
+          model: Loan,
+          as: "loans",
+          where: { ...loanFilter, ...loanIdFilter },
+          required: Object.keys(loanFilter).length > 0 || Object.keys(loanIdFilter).length > 0,
+        },
+        {
+          model: PlaidUser,
+          as: "plaidUser",
+          attributes: [
+            "kyc_status",
+            "kyc_details",
+            "anti_fraud_status",
+            "anti_fraud_details",
+            "regulatory_status",
+            // "regulatory_details",
+            // "documentary_verification",
+            "plaid_idv_status",
+            // "most_recent_idv_session_id",
+            // "watchlist_screening_id",
+          ],
+          required: false,
+          on: Sequelize.literal(`"User"."id" = CAST("plaidUser"."user_id" AS INTEGER)`) // ✅ Convert `user_id` to INTEGER in JOIN
+        },
+      ],
+      limit: usersPerPage,
+      offset,
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({
+      success: true,
+      users: users.rows,
+      totalPages: Math.ceil(users.count / usersPerPage),
+      currentPage: parseInt(page),
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch users" });
+  }
+};
+const getAllUsersWithLoans = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, searchQuery } = req.query;
+    const offset = (page - 1) * limit;
+
+    const searchQueryDecoded = searchQuery
+      ? decodeURIComponent(searchQuery).trim()
+      : null;
+
+    const isLoanIdSearch = searchQueryDecoded && !isNaN(searchQueryDecoded);
+
+    // User search conditions (first name, last name, email)
+    const userWhereConditions = isLoanIdSearch
+      ? {} // If searching by loan ID, no need for user filters
+      : searchQueryDecoded
+      ? {
+          [Op.or]: [
+            { firstName: { [Op.iLike]: `%${searchQueryDecoded}%` } },
+            { lastName: { [Op.iLike]: `%${searchQueryDecoded}%` } },
+            { email: { [Op.iLike]: `%${searchQueryDecoded}%` } },
+            Sequelize.literal(
+              `CONCAT("firstName", ' ', "lastName") ILIKE '%${searchQueryDecoded}%'`
+            ),
+          ],
+        }
+      : {};
+
+    // Loan search conditions (EXACT loan ID match)
+    const loanWhereConditions = isLoanIdSearch
+      ? { id: { [Op.eq]: searchQueryDecoded } }
+      : {};
+
+    // Query users with loan conditions & PlaidUser data
+    const users = await User.findAndCountAll({
+      where: userWhereConditions,
+      limit: parseInt(limit),
+      offset,
+      include: [
+        {
+          model: Loan,
+          as: "loans",
+          where: loanWhereConditions, // Only apply loan filter when searching by ID
+          attributes: ["id", "amount", "riskLevel", "riskScore", "status", "fromAccount", "toAccount","interest", "repaymentTerm", "isLoanComplete", "dueDate","createdAt"],
+          required: isLoanIdSearch, // Inner join when loan ID is provided
+        },
+        {
+          model: PlaidUser,
+          as: "plaidUser",
+          attributes: [
+            "kyc_status",
+            "kyc_details",
+            "anti_fraud_status",
+            "anti_fraud_details",
+            "regulatory_status",
+            // "regulatory_details",
+            // "documentary_verification",
+            "plaid_idv_status",
+            // "most_recent_idv_session_id",
+            // "watchlist_screening_id",
+          ],
+          required: false, // Use LEFT JOIN to include users even if they don't have PlaidUser data
+          on: Sequelize.literal(`"User"."id" = CAST("plaidUser"."user_id" AS INTEGER)`) // ✅ Fix data type mismatch
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({
+      success: true,
+      users: users.rows,
+      totalItems: users.count,
+      totalPages: Math.ceil(users.count / limit),
+      currentPage: parseInt(page),
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: error.message,
+    });
+  }
+};
+
 // Admin dashboard controller (requires authentication and admin role)
 const adminDashboard = (req, res) => {
   return res.json({ message: messages?.ADMIN_DASHBOARD });
 };
 
+const getUserRegistrations = async (req, res) => {
+  try {
+      const query = `
+          SELECT 
+              TO_CHAR("createdAt", 'Mon YYYY') AS month, 
+              COUNT(*) AS users
+          FROM "Users"
+          WHERE "createdAt" >= '2024-01-01'
+          GROUP BY month
+          ORDER BY MIN("createdAt");
+      `;
+
+      const userRegistrations = await sequelize.query(query, {
+          type: sequelize.QueryTypes.SELECT,
+      });
+
+      res.json({ success: true, data: userRegistrations });
+  } catch (error) {
+      console.error("Error fetching user registrations:", error);
+      res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+
+
 module.exports = {
-  adminLogin,handleOTPAndProfileUpdate,getUserDataForStatus,
-  adminDashboard,getUsersWithLoans,upload,getAdminProfile,changePassword,forgotPassword,resetPassword,getAllUsersWithLoans,getFilterData
+  adminLogin,handleOTPAndProfileUpdate,getUserDataForStatus,AdminGraphLoanDetails,AdminTransactionGraphData,
+  adminDashboard,getUsersWithLoans,upload,getAdminProfile,changePassword,forgotPassword,resetPassword,getAllUsersWithLoans,getFilterData,getUserRegistrations
 };

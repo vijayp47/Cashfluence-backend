@@ -2,9 +2,11 @@
 // const express = require('express');
 // const dotenv = require('dotenv');
 // const cors = require('cors');
+// const path = require('path');
 // const session = require('express-session');
 // // Initialize express app
 // const app = express();
+
 // // Load environment variables
 // dotenv.config();
 
@@ -29,21 +31,30 @@
 // }));
 
 
-
+// const { connectDB, syncDB } = require('./config/db'); // Import connectDB and syncDB functions
 // const authRoutes = require('./routes/authRoutes');
 // const kycRoutes = require('./routes/kycRoutes');
 // const phylloRoutes = require('./routes/phylloRoute');
 // const plaidRoutes = require('./routes/plaidRoute');
 // const loanRoutes = require('./routes/loanRoutes'); // Import loan routes
-// const { connectDB, syncDB } = require('./config/db'); // Import connectDB and syncDB functions
 // const adminRoutes = require("./routes/adminRoutes");
 // const messages = require('./constants/Messages');
-// const path = require('path');
+// const paymentRoutes = require("./routes/paymentRoutes");
+// const stripeRoutes = require("./routes/stripeRoutes"); 
 
 // app.use('/uploads', (req, res, next) => {
 
 //   next();
 // }, express.static(path.join(__dirname, 'uploads')));
+
+
+// app.use((req, res, next) => {
+//   if (req.originalUrl === "/webhook") {
+//       next(); // Skip body-parser for webhook
+//   } else {
+//       express.json()(req, res, next);
+//   }
+// });
 
 // // Register routes
 // app.use('/api/auth', authRoutes);
@@ -51,7 +62,9 @@
 // app.use('/api/phyllo', phylloRoutes);
 // app.use('/api/loans', loanRoutes);
 // app.use('/api/admin', adminRoutes);
-
+// // Use Payment Routes
+// app.use("/api/payment", paymentRoutes);
+// app.use("/api/stripe", stripeRoutes);
 // app.use('/api/plaid', plaidRoutes);
 // // Error handling middleware
 // app.use((err, req, res, next) => {
@@ -87,124 +100,169 @@
 
 // // Start the server
 // startServer();
-
-
-// server.js
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const session = require('express-session');
-const PgSession = require('connect-pg-simple')(session);
-const { Pool } = require('pg');
-const path = require('path');
-const messages = require('./constants/Messages');
-
-// Load environment variables
-dotenv.config();
+const stripe = require("stripe")(
+  "sk_test_51QsM5MKGv97rduY5XuQLF5I6RTF6Xo3QPIPybmpJMbJXE1JFrehd21joSRpNtJVESgQ6vFqdWwCFyoIcG4PGJjU500xNty4f3i"
+);
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const path = require("path");
+const session = require("express-session");
+require("./models/association"); 
 
 // Initialize express app
 const app = express();
 
-const corsOptions = {
-  origin: process.env.baseUrl || "https://cashfluence-frontend.vercel.app", // Frontend URL
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true, // Allow cookies and credentials
-};
-
-// Apply CORS middleware globally
-
-// Handle preflight OPTIONS requests explicitly
-app.options('*', (req, res) => {
-  res.header("Access-Control-Allow-Origin", process.env.baseUrl || "https://cashfluence-frontend.vercel.app");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.sendStatus(204);
-});
-
-app.use(cors(corsOptions));
-// Middleware to parse JSON
-app.use(express.json());
-
-// PostgreSQL connection pool for sessions
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false, // Allow SSL connection
-  },
-});
+// Load environment variables
+dotenv.config();
 
 // Setup session middleware
-app.use(
-  session({
-    store: new PgSession({ pool }),
-    secret: process.env.SESSION_SECRET, // Secret key for sessions
-    resave: false, // Do not resave session data if not modified
-    saveUninitialized: false, // Do not save uninitialized sessions
-    cookie: {
-      secure: process.env.NODE_ENV === 'production', // Secure cookies in production
-      httpOnly: true, // Prevent client-side JavaScript from accessing cookies
-      maxAge: 3600000, // 1 hour cookie expiry
-    },
-  })
-);
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 3600000,
+  }
+}));
 
+// Enable CORS for frontend domain
+app.use(cors({
+  origin: process.env.baseUrl,
+  credentials: true,
+}));
 
+// Import database connection functions
+const { connectDB, syncDB } = require("./config/db");
 
-// Static file handling
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Import routes
+const authRoutes = require("./routes/authRoutes");
+const kycRoutes = require("./routes/kycRoutes");
+const phylloRoutes = require("./routes/phylloRoute");
+const plaidRoutes = require("./routes/plaidRoute");
+const loanRoutes = require("./routes/loanRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const messages = require("./constants/Messages");
+const paymentRoutes = require("./routes/paymentRoutes");
+const stripeRoutes = require("./routes/stripeRoutes");
 
-// Routes
-const authRoutes = require('./routes/authRoutes');
-const kycRoutes = require('./routes/kycRoutes');
-const phylloRoutes = require('./routes/phylloRoute');
-const plaidRoutes = require('./routes/plaidRoute');
-const loanRoutes = require('./routes/loanRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+// ✅ Ensure webhook request is NOT parsed as JSON
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/stripe/webhook") {
+    next(); // Skip body-parser for webhook
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
-// Register routes
-app.use('/api/auth', authRoutes);
-app.use('/api/kyc', kycRoutes);
-app.use('/api/phyllo', phylloRoutes);
-app.use('/api/loans', loanRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/plaid', plaidRoutes);
+// Serve static uploads folder
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Register API routes
+app.use("/api/auth", authRoutes);
+app.use("/api/kyc", kycRoutes);
+app.use("/api/phyllo", phylloRoutes);
+app.use("/api/loans", loanRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/payment", paymentRoutes);
+app.use("/api/stripe", stripeRoutes); 
+app.use("/api/plaid", plaidRoutes);
+app.get("/payment/success", (req, res) => {
+  res.sendFile(path.join(__dirname, "views/success.html"));
+});
+
+require("./config/cronJobs");
+
+// Payment Cancel Route
+app.get("/payment/cancel", (req, res) => {
+  res.sendFile(path.join(__dirname, "views/cancel.html"));
+});
+
+app.get("/retry-payment", async (req, res) => {
+  let { session_id, loan_id, emi_amount, user_id } = req.query; // ✅ Extract user_id
+  console.log("emi_amount", emi_amount);
+
+  if (!session_id || !loan_id || !user_id) {
+    return res.status(400).json({ error: "Missing session_id, loan_id, or user_id" });
+  }
+
+  try {
+    console.log("🔄 Retrieving Stripe session:", session_id);
+
+    // ✅ Retrieve existing Stripe session
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session && session.payment_status === "unpaid") {
+      console.log("✅ Redirecting to existing session:", session.url);
+      return res.redirect(session.url);
+    }
+
+    console.log("⚠️ Session expired. Creating a new session...");
+
+    const emiAmountCents = emi_amount ? parseFloat(emi_amount) * 100 : 5000;
+    console.log("✅ Final EMI Amount (cents):", emiAmountCents);
+
+    // ✅ Create a new checkout session
+    const newSession = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: "Loan EMI Payment" },
+            unit_amount: emiAmountCents,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: `http://localhost:3000/payment/success?session_id=${newSession.id}&loan_id=${loan_id}&user_id=${user_id}`,
+      cancel_url: `http://localhost:3000/payment/cancel?loan_id=${loan_id}&emiAmount=${emi_amount}`,
+      metadata: { user_id, loan_id }, // ✅ Include user_id
+    });
+
+    console.log("✅ New session created:", newSession.url);
+
+    return res.redirect(newSession.url);
+  } catch (error) {
+    console.error("❌ Error in retry-payment:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ error: messages?.ERROR || 'Internal server error' });
+  console.error(err.stack);
+  res.status(500).json({ error: messages?.ERROR });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: messages?.NOTFOUND || 'Not found' });
+// 404 handler for undefined routes
+app.use((req, res, next) => {
+  res.status(404).json({ error: messages?.NOTFOUND });
 });
 
 // Function to start the server
 const startServer = async () => {
   try {
-    const { connectDB, syncDB } = require('./config/db');
-
     // Connect to the database
     await connectDB();
 
-    // Sync database models
+    // Sync database models (creates tables if they don't exist)
     await syncDB();
 
-    // Start the server
+    // Start the server only after DB connection and syncing
     const PORT = process.env.PORT || 3000;
-    // console.log(PORT)
     app.listen(PORT, () => {
-      console.log(messages?.SERVER_PORT || `Server running on port ${PORT}`);
-      console.log(PORT)
+      console.log(`${messages?.SERVER_PORT} ${PORT}`);
     });
   } catch (err) {
-    console.error(messages?.DB_CONNECTION_ERROR || 'Failed to start server:', err);
+    console.error(messages?.DB_CONNECTION_ERROR, err);
     process.exit(1);
   }
 };
 
 // Start the server
 startServer();
+

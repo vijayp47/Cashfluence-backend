@@ -18,7 +18,7 @@ const {
   plaidIDVComplete,
   PlaidResetIdv,
   getpliadUserIdvStauts,
-  prefillUserData,getPlaidUserState
+  prefillUserData,getPlaidUserState,getBankAccountData,getAverageBalance,deleteAccountDetails,deleteBankDetails
 } = require('../controllers/plaidController');
 
 
@@ -46,7 +46,10 @@ router.post('/plaid_user_state', authenticateUser, getPlaidUserState);
 router.post('/ach_create_link_token', createACHLinkToken);
 router.post('/exchange_public_token', exchangePublicToken);
 router.post('/create_transfer', createTransferAuthorization);
-
+router.get('/bank_data',getBankAccountData);
+router.post('/average-balance', authenticateUser, getAverageBalance);
+router.delete('/delete-account', authenticateUser, deleteAccountDetails);
+router.delete('/delete-bank', authenticateUser, deleteBankDetails);
 module.exports = router;
 
 
