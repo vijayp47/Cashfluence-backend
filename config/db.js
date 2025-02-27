@@ -51,6 +51,7 @@
 const { Sequelize } = require('sequelize');
 const dotenv = require('dotenv');
 const messages = require('../constants/Messages');
+const pg = require('pg');  
 
 // Load environment variables
 dotenv.config();
@@ -59,6 +60,7 @@ dotenv.config();
 const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
+      dialectModule: require('pg'),
       protocol: 'postgres',
       logging: false, // Disable logging for production
       dialectOptions: {
