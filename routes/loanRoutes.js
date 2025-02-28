@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser, authenticateAdmin } = require('../middleware/authMiddleware');
-const {applyForLoan,getAllLoans, updateLoanStatus, getLoanDetails,checkPendingPayments,loanCompletedStatus } = require('../controllers/loanController');
+const {applyForLoan,getAllLoans, updateLoanStatus, getLoanDetails,checkPendingPayments,loanCompletedStatus,loanDuration } = require('../controllers/loanController');
 
 // User route to submit a loan application
 router.post('/apply', authenticateUser, applyForLoan);
@@ -15,6 +15,8 @@ router.post('/:id', authenticateAdmin,updateLoanStatus);
 
 router.get('/:loanId/pending-status', checkPendingPayments);
 router.post('/loanstatus/:loanId', loanCompletedStatus);
+
+router.get("/loan-durations", loanDuration);
 
 // Admin route to get loan details by ID
 router.get('/:id', authenticateUser, getLoanDetails);

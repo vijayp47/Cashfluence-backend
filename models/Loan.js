@@ -54,6 +54,14 @@ const Loan = sequelize.define('Loan', {
     type: DataTypes.DATE,
     allowNull: true, // Can be null if loan is not approved yet
   },
+  submitTime: {
+    type: DataTypes.DATE, // Loan apply submit time
+    allowNull: true,
+  },
+  duration: {
+    type: DataTypes.FLOAT, // Time taken in seconds
+    allowNull: true,
+  },
 }, {
   timestamps: true, // Sequelize will auto-manage createdAt/updatedAt
 });

@@ -164,6 +164,10 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: false // Default is false, meaning user hasn't paid
   },
+  lastLoginAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 

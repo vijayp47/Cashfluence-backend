@@ -700,13 +700,15 @@ const loginUser = async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
-
+    await user.update({ lastLoginAt: new Date() });
+   
     // Send response with the token
     res.json({
       success: true, // Success status
       message: messages?.LOGIN,
       userId:payload?.userId,
-      token, // Send the JWT token in the response
+      token, // JWT token in the response
+      lastLoginAt: user.lastLoginAt 
     });
   } catch (err) {
     console.error(messages?.LOGIN_ERROR, err);
@@ -714,6 +716,27 @@ const loginUser = async (req, res) => {
   }
 };
 
+
+const getLastLoginAt = async (req, res) => {
+  try {
+    // Get userId from request (assuming authentication middleware adds `req.user.userId`)
+    const userId = req.user.userId;
+
+    // Fetch user details
+    const user = await User.findOne({
+      where: { userId },
+      attributes: ["lastLoginAt"], 
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, lastLoginAt: user.lastLoginAt });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error fetching last login time", error: error.message });
+  }
+};
 
 
 const contactSupport = async (req, res) => {
@@ -1165,5 +1188,5 @@ module.exports = {
   loginUser,
   verifyOtp,
   forgotPassword,
-  resetPassword,contactSupport,changePassword,handleOTPAndUserProfileUpdate,upload,getUserProfile,updateOneTimePaymentIdentityStatus
+  resetPassword,contactSupport,changePassword,handleOTPAndUserProfileUpdate,upload,getUserProfile,updateOneTimePaymentIdentityStatus,getLastLoginAt
 };

@@ -410,6 +410,7 @@ const sendDueDateReminderEmail = async (
   totalEmis,
   adminEmail
 ) => {
+  console.log("✅ scheduleDueDateEmails called on Vercel");
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -495,8 +496,6 @@ if(!isPaid){
       <p><strong>Important:</strong> If the payment is not made by the due date, i.e., <strong>${dueDate}</strong>, a late fee of <strong>$50</strong> will be applied to your loan.</p>
       `;
 }
-
-
       console.log(`Checking if fine email is needed for EMI #${emiNo}`);
 
       // ✅ Check if payment exists after 30 min
@@ -620,6 +619,8 @@ const scheduleDueDateEmails = (
       const scheduleTime = moment(dueDate)
         .subtract(daysBefore, "minutes")
         .toDate();
+
+      console.log(`🕒 Scheduling EMI reminders on Vercel for loan ${loanId}`);
 
       schedule.scheduleJob(scheduleTime, function () {
         console.log(
@@ -801,8 +802,22 @@ const applyForLoan = async (req, res) => {
       riskLevel,
       riskScore,
       fromAccount, // fromAccount as a whole object
-      toAccount, // toAccount as a whole object
+    
+      lastLoginAt
     } = req.body;
+    const submitTime = new Date(); // Current time
+    let duration = null; // Default null if lastLoginAt is missing
+
+    if (lastLoginAt) {
+      const lastLoginTime = new Date(lastLoginAt).getTime();
+      if (!isNaN(lastLoginTime)) {
+        duration = (submitTime.getTime() - lastLoginTime) / 1000; // Convert to seconds
+      }
+    }
+
+    console.log("User lastLoginAt:", lastLoginAt);
+    console.log("Submit Time:", submitTime);
+    console.log("Duration (seconds):", duration);
 
     // Create a loan application linked to the authenticated user
     const loanApplication = await Loan.create({
@@ -818,7 +833,9 @@ const applyForLoan = async (req, res) => {
 
       // Storing fromAccount and toAccount as entire objects
       fromAccount, // Storing the entire fromAccount object
-      toAccount, // Storing the entire toAccount object
+      // toAccount, // Storing the entire toAccount object
+      submitTime,
+      duration, // Save duration
     });
 
     // Send response with the loan application details
@@ -855,6 +872,22 @@ const getAllLoans = async (req, res) => {
   }
 };
 
+const loanDuration =async (req, res) => {
+  try {
+    const data = await Loan.findAll({
+      attributes: ["userId", "duration", "submitTime"],
+      order: [["submitTime", "DESC"]], // Sort by latest applications
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching loan durations",
+      error: error.message,
+    });
+  }
+};
 const checkPendingPayments = async (req, res) => {
   try {
     const { loanId } = req.params; // Get loanId from request params
@@ -961,5 +994,5 @@ module.exports = {
   updateLoanStatus,
   getLoanDetails,
   checkPendingPayments,
-  loanCompletedStatus
+  loanCompletedStatus,loanDuration
 };
