@@ -594,55 +594,6 @@ if(!isPaid){
   }
 };
 
-// const scheduleDueDateEmails = (
-//   userEmail,
-//   userName,
-//   loanAmount,
-//   interestRate,
-//   approvalDate,
-//   loanId,
-//   userId,
-//   months,
-//   adminEmail
-// ) => {
-//   const totalAmount = (loanAmount * (1 + interestRate / 100)).toFixed(2);
-//   const emiAmount = (totalAmount / months).toFixed(2);
-
-//   for (let emiNo = 1; emiNo <= months; emiNo++) {
-//     const dueDate = moment()
-//       .add(emiNo * 2, "minutes")
-//       .format("YYYY-MM-DD HH:mm");
-//     const reminderTimes = [1, 0]; // Reminders 2 min, 1 min, and at due time
-
-//     reminderTimes.forEach((daysBefore) => {
-//       const scheduleTime = moment(dueDate)
-//         .subtract(daysBefore, "minutes")
-//         .toDate();
-
-//       schedule.scheduleJob(scheduleTime, function () {
-//         console.log(
-//           `⏳ Scheduled reminder for EMI #${emiNo} out of ${months} at ${scheduleTime}`
-//         );
-
-//         sendDueDateReminderEmail(
-//           userEmail,
-//           userName,
-//           totalAmount,
-//           emiAmount,
-//           dueDate,
-//           loanId,
-//           userId,
-//           daysBefore,
-//           emiNo,
-//           months,
-//           adminEmail
-//         );
-//       });
-//     });
-//   }
-// };
-
-
 const scheduleDueDateEmails = (
   userEmail,
   userName,
@@ -668,6 +619,11 @@ const scheduleDueDateEmails = (
         .subtract(daysBefore, "minutes")
         .toDate();
 
+      schedule.scheduleJob(scheduleTime, function () {
+        console.log(
+          `⏳ Scheduled reminder for EMI #${emiNo} out of ${months} at ${scheduleTime}`
+        );
+
         sendDueDateReminderEmail(
           userEmail,
           userName,
@@ -681,10 +637,10 @@ const scheduleDueDateEmails = (
           months,
           adminEmail
         );
+      });
     });
   }
 };
-
 
 const loanCompletedStatus = async (req, res) => {
   const loanId = req.params.loanId; // Get loanId from URL params
