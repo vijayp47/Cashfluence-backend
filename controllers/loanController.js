@@ -595,7 +595,57 @@ if(!isPaid){
   }
 };
 
-const scheduleDueDateEmails = (
+// const scheduleDueDateEmails = (
+//   userEmail,
+//   userName,
+//   loanAmount,
+//   interestRate,
+//   approvalDate,
+//   loanId,
+//   userId,
+//   months,
+//   adminEmail
+// ) => {
+//   const totalAmount = (loanAmount * (1 + interestRate / 100)).toFixed(2);
+//   const emiAmount = (totalAmount / months).toFixed(2);
+
+//   for (let emiNo = 1; emiNo <= months; emiNo++) {
+//     const dueDate = moment()
+//       .add(emiNo * 2, "minutes")
+//       .format("YYYY-MM-DD HH:mm");
+//     const reminderTimes = [1, 0]; // Reminders 2 min, 1 min, and at due time
+
+//     reminderTimes.forEach((daysBefore) => {
+//       const scheduleTime = moment(dueDate)
+//         .subtract(daysBefore, "minutes")
+//         .toDate();
+
+//       console.log(`🕒 Scheduling EMI reminders on Vercel for loan ${loanId}`);
+
+//       schedule.scheduleJob(scheduleTime, function () {
+//         console.log(
+//           `⏳ Scheduled reminder for EMI #${emiNo} out of ${months} at ${scheduleTime}`
+//         );
+
+//         sendDueDateReminderEmail(
+//           userEmail,
+//           userName,
+//           totalAmount,
+//           emiAmount,
+//           dueDate,
+//           loanId,
+//           userId,
+//           daysBefore,
+//           emiNo,
+//           months,
+//           adminEmail
+//         );
+//       });
+//     });
+//   }
+// };
+
+const scheduleDueDateEmails = async (
   userEmail,
   userName,
   loanAmount,
@@ -610,38 +660,75 @@ const scheduleDueDateEmails = (
   const emiAmount = (totalAmount / months).toFixed(2);
 
   for (let emiNo = 1; emiNo <= months; emiNo++) {
-    const dueDate = moment()
-      .add(emiNo * 2, "minutes")
-      .format("YYYY-MM-DD HH:mm");
-    const reminderTimes = [1, 0]; // Reminders 2 min, 1 min, and at due time
+    const dueDate = moment().add(emiNo * 2, "minutes").toDate();
+    const reminderTimes = [1, 0]; // 1 min before & at due time
 
-    reminderTimes.forEach((daysBefore) => {
-      const scheduleTime = moment(dueDate)
-        .subtract(daysBefore, "minutes")
-        .toDate();
+    for (const daysBefore of reminderTimes) {
+      const scheduleTime = moment(dueDate).subtract(daysBefore, "minutes").toDate();
 
-      console.log(`🕒 Scheduling EMI reminders on Vercel for loan ${loanId}`);
-
-      schedule.scheduleJob(scheduleTime, function () {
-        console.log(
-          `⏳ Scheduled reminder for EMI #${emiNo} out of ${months} at ${scheduleTime}`
-        );
-
-        sendDueDateReminderEmail(
-          userEmail,
-          userName,
-          totalAmount,
-          emiAmount,
-          dueDate,
-          loanId,
-          userId,
-          daysBefore,
-          emiNo,
-          months,
-          adminEmail
-        );
+      // ✅ Instead of scheduling in memory, insert into DB
+      await db.ScheduledJobs.create({
+        userEmail,
+        userName,
+        totalAmount,
+        emiAmount,
+        dueDate: scheduleTime,
+        loanId,
+        userId,
+        daysBefore,
+        emiNo,
+        months,
+        adminEmail,
+        status: "pending", // Mark job as pending
+        createdAt: new Date(),
       });
+
+      console.log(`✅ Job stored in DB for EMI #${emiNo} at ${scheduleTime}`);
+    }
+  }
+};
+
+const processScheduledJobs = async (req, res) => {
+  try {
+    const now = new Date();
+
+    // ✅ Fetch jobs that are due now
+    const pendingJobs = await db.ScheduledJobs.findAll({
+      where: {
+        dueDate: { [Op.lte]: now }, // Jobs with dueDate <= now
+        status: "pending",
+      },
     });
+
+    for (const job of pendingJobs) {
+      console.log(`📧 Sending reminder for EMI #${job.emiNo} at ${job.dueDate}`);
+
+      // ✅ Call sendDueDateReminderEmail()
+      await sendDueDateReminderEmail(
+        job.userEmail,
+        job.userName,
+        job.totalAmount,
+        job.emiAmount,
+        job.dueDate,
+        job.loanId,
+        job.userId,
+        job.daysBefore,
+        job.emiNo,
+        job.months,
+        job.adminEmail
+      );
+
+      // ✅ Mark job as completed
+      job.status = "completed";
+      await job.save();
+
+      console.log(`✅ Email sent for EMI #${job.emiNo} at ${job.dueDate}`);
+    }
+
+    res.json({ success: true, message: `Processed ${pendingJobs.length} scheduled emails.` });
+  } catch (error) {
+    console.error("⚠ Error processing scheduled jobs:", error);
+    res.status(500).json({ success: false, message: "Error processing jobs" });
   }
 };
 
@@ -1007,5 +1094,6 @@ module.exports = {
   updateLoanStatus,
   getLoanDetails,
   checkPendingPayments,
+  processScheduledJobs,
   loanCompletedStatus,loanDuration,cronJob
 };
