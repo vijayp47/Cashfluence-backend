@@ -645,6 +645,19 @@ const scheduleDueDateEmails = (
   }
 };
 
+
+const cronJob = async (req, res) => {
+  const { emiNo, dueDate } = req.body;
+  const scheduleTime = moment(dueDate).subtract(1, "minutes").toDate();
+
+  schedule.scheduleJob(scheduleTime, function () {
+    console.log(`📧 Sending reminder for EMI #${emiNo} at ${scheduleTime}`);
+  });
+
+  res.send("Email scheduled successfully!");
+};
+
+
 const loanCompletedStatus = async (req, res) => {
   const loanId = req.params.loanId; // Get loanId from URL params
   const { isLoanComplete } = req.body; // Get the isLoanComplete status from request body
@@ -994,5 +1007,5 @@ module.exports = {
   updateLoanStatus,
   getLoanDetails,
   checkPendingPayments,
-  loanCompletedStatus,loanDuration
+  loanCompletedStatus,loanDuration,cronJob
 };
