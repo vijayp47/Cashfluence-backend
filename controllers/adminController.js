@@ -658,6 +658,9 @@ const getAdminProfile = async (req, res) => {
 };
 
 
+
+
+
 const getFilterData = async (req, res) => {
   try {
     // Fetch all loans, including both fromAccount and toAccount
@@ -718,31 +721,102 @@ const getFilterData = async (req, res) => {
   }
 };
 
-const getUserDataForStatus = async(req,res) =>{
+// const getUserDataForStatus = async(req,res) =>{
+//   const { userId } = req.params;
+//   try {
+//     // Fetch user data with associated loans
+//     const user = await User.findOne({
+//       where: { id: userId },
+//       include: [
+//         {
+//           model: Loan,
+//           as: 'loans',
+//           attributes: [
+//             'id',
+//             'amount',
+//             'repaymentTerm',
+//             'status',
+//             'fromAccount',
+//             'toAccount',
+//             'interest',
+//             'riskLevel',
+//             'riskScore',
+//             'loanrequested',
+//             'isLoanComplete',
+//             "dueDate",
+//             'createdAt',
+//           ], // Include only the necessary fields
+//         },
+//       ],
+//     });
+
+//     // Check if user exists
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'User not found',
+//       });
+//     }
+
+//     // Send the user data with associated loans
+//     res.status(200).json({
+//       success: true,
+//       user,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching user data:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Failed to fetch user data',
+//       error: error.message,
+//     });
+//   }
+// }
+
+const getUserDataForStatus = async (req, res) => {
   const { userId } = req.params;
   try {
-    // Fetch user data with associated loans
+    // Fetch user data with associated loans and transactions
     const user = await User.findOne({
       where: { id: userId },
       include: [
         {
           model: Loan,
-          as: 'loans',
+          as: "loans",
           attributes: [
-            'id',
-            'amount',
-            'repaymentTerm',
-            'status',
-            'fromAccount',
-            'toAccount',
-            'interest',
-            'riskLevel',
-            'riskScore',
-            'loanrequested',
-            'isLoanComplete',
+            "id",
+            "amount",
+            "repaymentTerm",
+            "status",
+            "fromAccount",
+            "toAccount",
+            "interest",
+            "riskLevel",
+            "riskScore",
+            "loanrequested",
+            "isLoanComplete",
             "dueDate",
-            'createdAt',
-          ], // Include only the necessary fields
+            "createdAt"
+          ], // ✅ Removed "transactions" from attributes
+
+          include: [
+            {
+              model: Transaction,
+              as: "transactions", // ✅ Ensure alias matches your association
+              attributes: [
+                "user_id",
+                "loan_id",
+                "stripe_payment_id",
+                "amount",
+                "status",
+                "payment_date",
+                "emi_no",
+                "fine_email_sent"
+              ],
+              required: false, // ✅ Allow loans with no transactions
+              where: { status: { [Op.ne]: "failed" } }, // ✅ Exclude failed transactions
+            },
+          ],
         },
       ],
     });
@@ -751,24 +825,24 @@ const getUserDataForStatus = async(req,res) =>{
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found',
+        message: "User not found",
       });
     }
 
-    // Send the user data with associated loans
+    // Send the user data with associated loans and transactions
     res.status(200).json({
       success: true,
       user,
     });
   } catch (error) {
-    console.error('Error fetching user data:', error);
+    console.error("Error fetching user data:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch user data',
+      message: "Failed to fetch user data",
       error: error.message,
     });
   }
-}
+};
 
 const getUsersWithLoans = async (req, res) => {
   try {

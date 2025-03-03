@@ -332,14 +332,15 @@ const getTransactionsByUserAndLoan = async (req = null, res = null, userId = nul
 
       // ✅ Fetch transactions from database
       const transactions = await sequelize.query(
-          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = :loanId`,
+          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS INTEGER)`,
+
           {
               replacements: { userId, loanId },
               type: sequelize.QueryTypes.SELECT,
           }
       );
 
-      console.log("transactions------------", transactions);
+      // console.log("transactions------------", transactions);
 
       // ✅ If No Transactions Found
       if (transactions.length === 0) {
