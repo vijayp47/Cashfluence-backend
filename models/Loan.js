@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-const User = require('./User');  // Ensure User model is correctly defined
+const User = require('./User');
+const Transaction = require('./Transaction');
 
 const Loan = sequelize.define('Loan', {
   amount: {
@@ -67,7 +68,7 @@ const Loan = sequelize.define('Loan', {
 });
 
 // Association with User model
-Loan.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-User.hasMany(Loan, { foreignKey: 'userId', as: 'loans' });
+
+
 
 module.exports = Loan;

@@ -12,7 +12,7 @@ const Transaction = sequelize.define("Transaction", {
     allowNull: false,
   },
   loan_id: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     allowNull: false,
   },
   stripe_payment_id: {

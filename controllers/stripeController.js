@@ -328,11 +328,11 @@ const getTransactionsByUserAndLoan = async (req = null, res = null, userId = nul
 
       // ✅ Convert user_id & loan_id to String to match DB types
       userId = String(userId);
-      loanId = String(loanId);
+      loanId = Number(loanId);
 
       // ✅ Fetch transactions from database
       const transactions = await sequelize.query(
-          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS VARCHAR)`,
+          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:userId AS INTEGER)`,
           {
               replacements: { userId, loanId },
               type: sequelize.QueryTypes.SELECT,
@@ -381,14 +381,14 @@ const getTransactionByEmi = async (userId, loanId, emiNo, retries = 3, delay = 2
       console.log(`🟢 Running SQL Query: ${sqlQuery}`);
       console.log(`🟢 With Parameters:`, { 
         userId: String(userId).trim(), 
-        loanId: String(loanId).trim(), 
+        loanId: Number(loanId), 
         emiNo: Number(emiNo) // Ensure emiNo is an integer
       });
 
       const transaction = await sequelize.query(sqlQuery, {
         replacements: { 
           userId: String(userId).trim(), 
-          loanId: String(loanId).trim(), 
+          loanId: Number(loanId), 
           emiNo: Number(emiNo) // Convert to integer
         },
         type: sequelize.QueryTypes.SELECT,
