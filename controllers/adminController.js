@@ -721,58 +721,6 @@ const getFilterData = async (req, res) => {
   }
 };
 
-// const getUserDataForStatus = async(req,res) =>{
-//   const { userId } = req.params;
-//   try {
-//     // Fetch user data with associated loans
-//     const user = await User.findOne({
-//       where: { id: userId },
-//       include: [
-//         {
-//           model: Loan,
-//           as: 'loans',
-//           attributes: [
-//             'id',
-//             'amount',
-//             'repaymentTerm',
-//             'status',
-//             'fromAccount',
-//             'toAccount',
-//             'interest',
-//             'riskLevel',
-//             'riskScore',
-//             'loanrequested',
-//             'isLoanComplete',
-//             "dueDate",
-//             'createdAt',
-//           ], // Include only the necessary fields
-//         },
-//       ],
-//     });
-
-//     // Check if user exists
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'User not found',
-//       });
-//     }
-
-//     // Send the user data with associated loans
-//     res.status(200).json({
-//       success: true,
-//       user,
-//     });
-//   } catch (error) {
-//     console.error('Error fetching user data:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Failed to fetch user data',
-//       error: error.message,
-//     });
-//   }
-// }
-
 const getUserDataForStatus = async (req, res) => {
   const { userId } = req.params;
   try {
@@ -796,7 +744,8 @@ const getUserDataForStatus = async (req, res) => {
             "loanrequested",
             "isLoanComplete",
             "dueDate",
-            "createdAt"
+            "createdAt",
+            "overdueStatus"
           ], // ✅ Removed "transactions" from attributes
 
           include: [
@@ -843,6 +792,7 @@ const getUserDataForStatus = async (req, res) => {
     });
   }
 };
+
 
 const getUsersWithLoans = async (req, res) => {
   try {
@@ -951,6 +901,7 @@ const getUsersWithLoans = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch users" });
   }
 };
+
 const getAllUsersWithLoans = async (req, res) => {
   try {
     const { page = 1, limit = 10, searchQuery } = req.query;
@@ -993,7 +944,7 @@ const getAllUsersWithLoans = async (req, res) => {
           model: Loan,
           as: "loans",
           where: loanWhereConditions, // Only apply loan filter when searching by ID
-          attributes: ["id", "amount", "riskLevel", "riskScore", "status", "fromAccount", "toAccount","interest", "repaymentTerm", "isLoanComplete", "dueDate","createdAt"],
+          attributes: ["id", "amount", "riskLevel", "riskScore", "status", "fromAccount", "toAccount","interest", "repaymentTerm", "isLoanComplete", "dueDate","createdAt","overdueStatus"],
           required: isLoanIdSearch, // Inner join when loan ID is provided
           include: [
             {

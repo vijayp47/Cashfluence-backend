@@ -1,7 +1,5 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-const User = require('./User');
-const Transaction = require('./Transaction');
 
 const Loan = sequelize.define('Loan', {
   amount: {
@@ -51,7 +49,7 @@ const Loan = sequelize.define('Loan', {
     allowNull: false,
     defaultValue: false,
   },
-  dueDate: { //  New column for next due date
+  dueDate: { // New column for next due date
     type: DataTypes.DATE,
     allowNull: true, // Can be null if loan is not approved yet
   },
@@ -63,12 +61,13 @@ const Loan = sequelize.define('Loan', {
     type: DataTypes.FLOAT, // Time taken in seconds
     allowNull: true,
   },
+  overdueStatus: { // 🆕 New Column for Overdue Status
+    type: DataTypes.STRING,
+    allowNull: true, // Can be null initially
+    defaultValue: null, // Possible values: null, 'Overdue'
+  },
 }, {
   timestamps: true, // Sequelize will auto-manage createdAt/updatedAt
 });
-
-// Association with User model
-
-
 
 module.exports = Loan;

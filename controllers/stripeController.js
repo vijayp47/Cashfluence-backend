@@ -1,3 +1,4 @@
+const Loan = require("../models/Loan");
 const stripe = require("stripe")(
   "sk_test_51QsM5MKGv97rduY5XuQLF5I6RTF6Xo3QPIPybmpJMbJXE1JFrehd21joSRpNtJVESgQ6vFqdWwCFyoIcG4PGJjU500xNty4f3i"
 );
@@ -38,69 +39,96 @@ const endpointSecret =
 };
 
 
-const stripeWebhook = async (req, res) => {
-  console.log("Received Stripe Webhook");
 
+// const stripeWebhook = async (req, res) => {
+//   console.log("Received Stripe Webhook");
+
+//   const sig = req.headers["stripe-signature"];
+//   let event;
+
+//   try {
+//     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+//     console.log("Webhook Event:", event);
+
+//     if (event.type === "checkout.session.completed") {
+//       const session = event.data.object;
+//       const userId = session.metadata.user_id;
+//       const loanId = session.metadata.loan_id;
+//       const amountPaid = session.amount_total / 100;
+//       const stripePaymentId = session.payment_intent;
+//       const emiNo = session.metadata.emi_no;  
+//       const totalEmis = session.metadata.totalEmis;
+
+//       // ✅ Fetch payment date
+//       const paymentIntent = await stripe.paymentIntents.retrieve(stripePaymentId);
+//       const paymentDate = new Date(paymentIntent.created * 1000);
+
+//       console.log(`✅ Payment received: User ${userId}, Loan ${loanId}, EMI ${emiNo}, Amount ${amountPaid}`);
+
+//       // ✅ Insert transaction record including EMI number
+//       await sequelize.query(
+//         `INSERT INTO transactions (user_id, loan_id, stripe_payment_id, amount, payment_date, status, emi_no) 
+//          VALUES (:userId, :loanId, :stripePaymentId, :amountPaid, :paymentDate, :status, :emiNo)`,
+//         {
+//           replacements: { userId, loanId, stripePaymentId, amountPaid, paymentDate, status: "completed", emiNo },
+//           type: sequelize.QueryTypes.INSERT,
+//         }
+//       );
+
+//       // ✅ Check if previous EMI was unpaid
+//       const previousEmiNo = emiNo - 1;
+//       const previousEmiPaid = previousEmiNo > 0 ? await getTransactionByEmi(userId, loanId, previousEmiNo) : true;
+
+//       // ✅ Update loan due date
+//       if (emiNo <= totalEmis) {
+//         await sequelize.query(
+//           `UPDATE "Loans" 
+//            SET "dueDate" = "dueDate" + INTERVAL '1 month' 
+//            WHERE "id" = :loanId AND "userId" = :userId`,
+//           { replacements: { loanId, userId }, type: sequelize.QueryTypes.UPDATE }
+//         );
+//         console.log("✅ Due date updated successfully.");
+//       }
+
+//       // ✅ If previous EMI was unpaid, mark late payment
+//       if (!previousEmiPaid) {
+//         console.log(`⚠️ Late payment detected for EMI ${previousEmiNo}, adding fine for next EMI.`);
+//       }
+//     }
+
+//     res.status(200).send("Webhook processed successfully.");
+//   } catch (error) {
+//     console.error("Webhook Error:", error);
+//     res.status(400).send(`Webhook error: ${error.message}`);
+//   }
+// };
+
+const stripeWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
-
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    console.log("Webhook Event:", event);
-
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       const userId = session.metadata.user_id;
       const loanId = session.metadata.loan_id;
-      const amountPaid = session.amount_total / 100;
-      const stripePaymentId = session.payment_intent;
-      const emiNo = session.metadata.emi_no;  
-      const totalEmis = session.metadata.totalEmis;
-
-      // ✅ Fetch payment date
-      const paymentIntent = await stripe.paymentIntents.retrieve(stripePaymentId);
-      const paymentDate = new Date(paymentIntent.created * 1000);
-
-      console.log(`✅ Payment received: User ${userId}, Loan ${loanId}, EMI ${emiNo}, Amount ${amountPaid}`);
-
-      // ✅ Insert transaction record including EMI number
+      const emiNo = session.metadata.emi_no;
+      await sequelize.query(
+        `UPDATE "Loans" SET "dueDate" = "dueDate" + INTERVAL '1 month' WHERE "id" = :loanId`,
+        { replacements: { loanId }, type: sequelize.QueryTypes.UPDATE }
+      );
       await sequelize.query(
         `INSERT INTO transactions (user_id, loan_id, stripe_payment_id, amount, payment_date, status, emi_no) 
-         VALUES (:userId, :loanId, :stripePaymentId, :amountPaid, :paymentDate, :status, :emiNo)`,
-        {
-          replacements: { userId, loanId, stripePaymentId, amountPaid, paymentDate, status: "completed", emiNo },
-          type: sequelize.QueryTypes.INSERT,
-        }
+         VALUES (:userId, :loanId, :stripePaymentId, :amountPaid, NOW(), 'completed', :emiNo)`,
+        { replacements: { userId, loanId, stripePaymentId: session.payment_intent, amountPaid: session.amount_total / 100, emiNo }, type: sequelize.QueryTypes.INSERT }
       );
-
-      // ✅ Check if previous EMI was unpaid
-      const previousEmiNo = emiNo - 1;
-      const previousEmiPaid = previousEmiNo > 0 ? await getTransactionByEmi(userId, loanId, previousEmiNo) : true;
-
-      // ✅ Update loan due date
-      if (emiNo <= totalEmis) {
-        await sequelize.query(
-          `UPDATE "Loans" 
-           SET "dueDate" = "dueDate" + INTERVAL '1 month' 
-           WHERE "id" = :loanId AND "userId" = :userId`,
-          { replacements: { loanId, userId }, type: sequelize.QueryTypes.UPDATE }
-        );
-        console.log("✅ Due date updated successfully.");
-      }
-
-      // ✅ If previous EMI was unpaid, mark late payment
-      if (!previousEmiPaid) {
-        console.log(`⚠️ Late payment detected for EMI ${previousEmiNo}, adding fine for next EMI.`);
-      }
+      await Loan.update({ overdueStatus: null }, { where: { id: loanId } });
     }
-
     res.status(200).send("Webhook processed successfully.");
   } catch (error) {
-    console.error("Webhook Error:", error);
     res.status(400).send(`Webhook error: ${error.message}`);
   }
 };
-
 
 const getOverdueEmis = async () => {
   try {
@@ -309,38 +337,39 @@ cron.schedule("0 0 * * *", async () => {
 // };
 
 // ✅ Get Transactions by User ID and Loan ID
-const getTransactionsByUserAndLoan = async (req = null, res = null, userId = null, loanId = null) => {
+const getTransactionsByUserAndLoan = async (req = null, res = null, userId = null, loanId = null,
+  emiNo) => {
   try {
       // ✅ If called via API, extract from `req.query`
       if (req) {
           userId = req.query.user_id;
           loanId = req.query.loan_id;
+          emiNo = req.query.emiNo;
       }
 
-      console.log("userId999:", userId, typeof userId);
-      console.log("loanId999:", loanId, typeof loanId);
+   
 
       // ✅ Validate Inputs
-      if (!userId || !loanId) {
-          if (res) return res.status(400).json({ error: "user_id and loan_id are required" });
+      if (!userId || !loanId || !emiNo) {
+          if (res) return res.status(400).json({ error: "user_id , loan_id and emi no are required" });
           return []; // Return empty array for internal calls
       }
 
       // ✅ Convert user_id & loan_id to String to match DB types
       userId = String(userId);
-      loanId = Number(loanId);
+      emiNo = Number(emiNo);
+      
 
       // ✅ Fetch transactions from database
       const transactions = await sequelize.query(
-          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS INTEGER)`,
-
+          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS INTEGER) AND emi_no = CAST(:emiNo AS INTEGER)`,
           {
-              replacements: { userId, loanId },
+              replacements: { userId, loanId ,emiNo},
               type: sequelize.QueryTypes.SELECT,
           }
       );
 
-      // console.log("transactions------------", transactions);
+      console.log("transactions------------", transactions);
 
       // ✅ If No Transactions Found
       if (transactions.length === 0) {
