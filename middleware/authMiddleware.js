@@ -1,11 +1,6 @@
 // middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const messages = require('../constants/Messages');
-
-/**
- * Authenticate user middleware
- * Validates the JWT and populates `req.user` with the token payload.
- */
 const authenticateUser = (req, res, next) => {
  
   const token = req.header('Authorization')?.split(' ')[1]; // Extract token from "Bearer <token>"

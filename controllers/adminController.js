@@ -202,115 +202,6 @@ const adminLogin = async (req, res) => {
 
 const otpStore = {}; 
 
-
-
-// Function to check if the email exists and send OTP
-// const checkEmailAndSendOTP = async (req, res) => {
-//   const { email, otpInput } = req.body; // otpInput is optional for sending the OTP
-
-//   try {
-//     // If OTP input is provided, verify the OTP
-//     if (otpInput) {
-//       // Check if OTP exists for this email and validate the OTP
-//       if (!otpStore[email]) {
-//         return res.status(400).json({
-//           success: false,
-//           message: 'No OTP has been generated for this email.',
-//         });
-//       }
-
-//       // Check if OTP has expired
-//       if (Date.now() > otpStore[email].expiresAt) {
-//         delete otpStore[email]; // Clear expired OTP
-//         return res.status(400).json({
-//           success: false,
-//           message: 'OTP has expired. Please request a new one.',
-//         });
-//       }
-
-//       // Check if OTP matches
-//       if (otpStore[email].otp != otpInput) {
-//         return res.status(400).json({
-//           success: false,
-//           message: 'Invalid OTP. Please check and try again.',
-//         });
-//       }
-
-//       // If OTP is correct, return success message and set email as verified
-//       delete otpStore[email]; // OTP verified, remove it
-//       return res.status(200).json({
-//         success: true,
-//         message: 'Email verified successfully.',
-//         verified: true // Indicate email verification status
-//       });
-//     }
-
-//     // If no OTP is provided, generate and send a new OTP
-//     const existingAdmin = await Admin.findOne({ where: { email } });
-
-//     if (existingAdmin) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Email is already in use. Please choose another email.',
-//       });
-//     }
-
-//     // Send OTP to the new email
-//     await sendOTP(email); // Function to send OTP
-
-//     // Return response saying OTP is sent
-//     return res.status(200).json({
-//       success: true,
-//       message: 'OTP has been sent to the new email. Please verify it.',
-//       verified: false // Indicate email verification status
-//     });
-
-//   } catch (error) {
-//     console.error('Error checking email existence or sending OTP:', error);
-//     return res.status(500).json({
-//       success: false,
-//       message: 'Error checking email existence or sending OTP.',
-//     });
-//   }
-// };
-
-const sendOTP = async (email) => {
-  // Generate a random 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000);
-
-  // Store OTP in memory or database with expiration time (10 minutes)
-  otpStore[email] = {
-    otp: otp,
-    expiresAt: Date.now() + 10 * 60 * 1000, // OTP expires in 10 minutes
-  };
-
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-
-  const mailOptions = {
-    from: process.env.SMTP_USER,
-    to: email,
-    subject: 'OTP Verification for Profile Update',
-    text: `Your OTP for verifying your email is: ${otp}. It expires in 10 minutes.`,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-   
-  } catch (error) {
-    console.error('Error sending OTP:', error);
-    throw new Error('Failed to send OTP. Please try again later.');
-  }
-};
-
 const handleOTPAndProfileUpdate = async (req, res) => {
   const { email, otp, firstName, lastName } = req.body;
   const token = req.headers.authorization?.split(' ')[1];
@@ -658,12 +549,21 @@ const getAdminProfile = async (req, res) => {
 };
 
 
-
-
-
 const getFilterData = async (req, res) => {
   try {
-    // Fetch all loans, including both fromAccount and toAccount
+    const { overdueStatus } = req.query;
+
+    // Apply overdue status filtering if needed
+    const whereCondition = {};
+    if (overdueStatus && overdueStatus !== "All") {
+      if (overdueStatus === "Overdue") {
+        whereCondition.overdueStatus = "Overdue";
+      } else if (overdueStatus === "Not Overdue") {
+        whereCondition.overdueStatus = { [Op.ne]: "Overdue" };
+      }
+    }
+
+    // Fetch all loans with fromAccount and toAccount details
     const loans = await Loan.findAll({
       attributes: [
         [Sequelize.json('fromAccount.accountNumber'), 'accountNumber'],
@@ -672,39 +572,36 @@ const getFilterData = async (req, res) => {
         [Sequelize.json('toAccount.accountNumber'), 'accountNumberTo'],
         [Sequelize.json('toAccount.institutionName'), 'institutionNameTo'],
         [Sequelize.json('toAccount.accountName'), 'accountNameTo'],
+        "overdueStatus", // Include overdue status
       ],
+      where: whereCondition, // Apply overdue status filtering
     });
 
-    // Extract account data from the results for both fromAccount and toAccount
+    // Extract and format unique account data
     const accountData = [];
 
     loans.forEach(loan => {
-      // Add fromAccount data if it exists
       if (loan.dataValues.accountNumber && loan.dataValues.institutionName && loan.dataValues.accountName) {
         accountData.push({
           accountNumber: loan.dataValues.accountNumber,
           institutionName: loan.dataValues.institutionName,
           accountName: loan.dataValues.accountName,
+          overdueStatus: loan.dataValues.overdueStatus, // Include overdue status
         });
       }
-
-      // Add toAccount data if it exists
       if (loan.dataValues.accountNumberTo && loan.dataValues.institutionNameTo && loan.dataValues.accountNameTo) {
         accountData.push({
           accountNumber: loan.dataValues.accountNumberTo,
           institutionName: loan.dataValues.institutionNameTo,
           accountName: loan.dataValues.accountNameTo,
+          overdueStatus: loan.dataValues.overdueStatus, // Include overdue status
         });
       }
     });
 
-    // Remove duplicates based on accountNumber, institutionName, and accountName
-    const uniqueAccounts = accountData.filter((value, index, self) => 
-      index === self.findIndex((t) => (
-        t.accountNumber === value.accountNumber &&
-        t.institutionName === value.institutionName &&
-        t.accountName === value.accountName
-      ))
+    // Remove duplicates efficiently
+    const uniqueAccounts = Array.from(
+      new Map(accountData.map(item => [JSON.stringify(item), item])).values()
     );
 
     // Send response with distinct account data
@@ -746,13 +643,14 @@ const getUserDataForStatus = async (req, res) => {
             "dueDate",
             "createdAt",
             "overdueStatus"
-          ], // ✅ Removed "transactions" from attributes
+          ], 
 
           include: [
             {
               model: Transaction,
-              as: "transactions", // ✅ Ensure alias matches your association
+              as: "transactions", 
               attributes: [
+                "id",
                 "user_id",
                 "loan_id",
                 "stripe_payment_id",
@@ -762,8 +660,8 @@ const getUserDataForStatus = async (req, res) => {
                 "emi_no",
                 "fine_email_sent"
               ],
-              required: false, // ✅ Allow loans with no transactions
-              where: { status: { [Op.ne]: "failed" } }, // ✅ Exclude failed transactions
+              required: false, 
+              where: { status: { [Op.ne]: "failed" } }, 
             },
           ],
         },
@@ -805,6 +703,7 @@ const getUsersWithLoans = async (req, res) => {
       institutionName,
       accountName,
       searchQuery,
+      overdueStatus, // New Overdue Status Filter
     } = req.query;
 
     const usersPerPage = 10;
@@ -814,6 +713,15 @@ const getUsersWithLoans = async (req, res) => {
     if (loanStatus) loanFilter.status = loanStatus;
     if (loanMinAmount && loanMaxAmount) {
       loanFilter.amount = { [Op.between]: [loanMinAmount, loanMaxAmount] };
+    }
+
+    // Apply Overdue Status filter
+    if (overdueStatus) {
+      if (overdueStatus === "Overdue") {
+        loanFilter.overdueStatus = "Overdue";
+      } else if (overdueStatus === "Not Overdue") {
+        loanFilter.overdueStatus = { [Op.ne]: "Overdue" };
+      }
     }
 
     let userWhereCondition = {};
@@ -852,16 +760,26 @@ const getUsersWithLoans = async (req, res) => {
         {
           model: Loan,
           as: "loans",
-          where: { ...loanFilter, ...loanIdFilter },
+          where: { ...loanFilter, ...loanIdFilter }, // Overdue filter applied
           required: Object.keys(loanFilter).length > 0 || Object.keys(loanIdFilter).length > 0,
           include: [
             {
-              model: Transaction, // ✅ Fetch transactions within loans
+              model: Transaction,
               as: "transactions",
-              attributes: ["id", "user_id", "loan_id", "stripe_payment_id", "amount", "status", "payment_date", "emi_no", "fine_email_sent"],
+              attributes: [
+                "id",
+                "user_id",
+                "loan_id",
+                "stripe_payment_id",
+                "amount",
+                "status",
+                "payment_date",
+                "emi_no",
+                "fine_email_sent",
+              ],
               required: false,
               where: {
-                status: { [Op.ne]: "failed" }, // ✅ Exclude failed transactions
+                status: { [Op.ne]: "failed" },
               },
             },
           ],
@@ -875,14 +793,10 @@ const getUsersWithLoans = async (req, res) => {
             "anti_fraud_status",
             "anti_fraud_details",
             "regulatory_status",
-            // "regulatory_details",
-            // "documentary_verification",
             "plaid_idv_status",
-            // "most_recent_idv_session_id",
-            // "watchlist_screening_id",
           ],
           required: false,
-          on: Sequelize.literal(`"User"."id" = CAST("plaidUser"."user_id" AS INTEGER)`) // ✅ Convert `user_id` to INTEGER in JOIN
+          on: Sequelize.literal(`"User"."id" = CAST("plaidUser"."user_id" AS INTEGER)`),
         },
       ],
       limit: usersPerPage,
@@ -933,6 +847,13 @@ const getAllUsersWithLoans = async (req, res) => {
     const loanWhereConditions = isLoanIdSearch
       ? { id: { [Op.eq]: searchQueryDecoded } }
       : {};
+      if (overdueStatus && overdueStatus !== "All") {
+        if (overdueStatus === "Overdue") {
+          loanWhereConditions.overdueStatus = "Overdue";
+        } else if (overdueStatus === "Not Overdue") {
+          loanWhereConditions.overdueStatus = { [Op.ne]: "Overdue" };
+        }
+      }
 
     // Query users with loan conditions & PlaidUser data
     const users = await User.findAndCountAll({
@@ -948,12 +869,12 @@ const getAllUsersWithLoans = async (req, res) => {
           required: isLoanIdSearch, // Inner join when loan ID is provided
           include: [
             {
-              model: Transaction, // ✅ Fetch transactions within loans
+              model: Transaction, 
               as: "transactions",
               attributes: ["id", "user_id", "loan_id", "stripe_payment_id", "amount", "status", "payment_date", "emi_no", "fine_email_sent"],
               required: false,
               where: {
-                status: { [Op.ne]: "failed" }, // ✅ Exclude failed transactions
+                status: { [Op.ne]: "failed" }, 
               },
             },
           ],
@@ -975,7 +896,7 @@ const getAllUsersWithLoans = async (req, res) => {
             // "watchlist_screening_id",
           ],
           required: false, // Use LEFT JOIN to include users even if they don't have PlaidUser data
-          on: Sequelize.literal(`"User"."id" = CAST("plaidUser"."user_id" AS INTEGER)`) // ✅ Fix data type mismatch
+          on: Sequelize.literal(`"User"."id" = CAST("plaidUser"."user_id" AS INTEGER)`) //  Fix data type mismatch
         },
       ],
       order: [["createdAt", "DESC"]],

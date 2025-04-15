@@ -3,8 +3,6 @@ const axios = require("axios");
 const messages = require("../constants/Messages");
 const InterestRateTable = require("../models/InterestRateTable");
 const InterestRateStateData = require("../models/InterestRateStateData");
-// controllers/riskController.js
-
 const PHYLLO_BASE_URL = process.env.PHYLLO_BASE_URL;
 const SANDBOX_TOKEN = process.env.SANDBOX_TOKEN;
 const AUTH_TOKEN = `Basic ${SANDBOX_TOKEN}`;
@@ -329,15 +327,7 @@ const fetchanSocialAccount = async (req, res) => {
       ...platformFields[platformName]?.extra,
     };
 
-    // Fetch demographics data
-    // const demographicsResponse = await axios.get(`${PHYLLO_BASE_URL}/audience`, {
-    //   params: { account_id: account.id },
-    //   auth: {
-    //     username: process.env.PHYLLO_API_USERNAME,
-    //     password: process.env.PHYLLO_API_PASSWORD,
-    //   },
-    //   headers: { Authorization: AUTH_TOKEN },
-    // });
+  
 
     const contentResponse = await axios.get(`${PHYLLO_BASE_URL}/social/contents`, {
       params: {
@@ -432,54 +422,55 @@ const fetchanSocialAccount = async (req, res) => {
       },
       headers: { Authorization: AUTH_TOKEN },
     });
-    const income = {
-      "data": [
-        {
-          "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-          "created_at": "2020-03-27T12:56:34.534978",
-          "updated_at": "2020-03-27T12:56:34.534978",
-          "user": {
-            "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
-            "name": "John Doe"
-          },
-          "account": {
-            "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
-            "platform_username": "john.doe@gmail.com"
-          },
-          "work_platform": {
-            "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
-            "name": "Instagram",
-            "logo_url": "https://getphyllo.com/storage/instagram.png"
-          },
-          "amount": 123.45,
-          "currency": "USD",
-          "status": "SCHEDULED",
-          "payout_interval": "AUTOMATIC_DAILY",
-          "bank_details": {
-            "name": "string",
-            "account_last_digits": "string",
-            "account_routing_number": "string"
-          },
-          "external_id": "5790fbc3-b022-437b-abf8-0492c7a82056",
-          "payout_at": "2020-03-27T12:56:34.534978",
-          "platform_profile_id": "UCEyLTzBtHJhlUwkeWhxfMXw",
-          "platform_profile_name": "Peter Parker"
-        }
-      ],
-      "metadata": [
-        {
-          "offset": 0,
-          "limit": 10,
-          "from_date": "2020-12-31",
-          "to_date": "2021-12-31"
-        }
-      ]
-    };
+    // const income = {
+    //   "data": [
+    //     {
+    //       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+    //       "created_at": "2020-03-27T12:56:34.534978",
+    //       "updated_at": "2020-03-27T12:56:34.534978",
+    //       "user": {
+    //         "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
+    //         "name": "John Doe"
+    //       },
+    //       "account": {
+    //         "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
+    //         "platform_username": "john.doe@gmail.com"
+    //       },
+    //       "work_platform": {
+    //         "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
+    //         "name": "Instagram",
+    //         "logo_url": "https://getphyllo.com/storage/instagram.png"
+    //       },
+    //       "amount": 123.45,
+    //       "currency": "USD",
+    //       "status": "SCHEDULED",
+    //       "payout_interval": "AUTOMATIC_DAILY",
+    //       "bank_details": {
+    //         "name": "string",
+    //         "account_last_digits": "string",
+    //         "account_routing_number": "string"
+    //       },
+    //       "external_id": "5790fbc3-b022-437b-abf8-0492c7a82056",
+    //       "payout_at": "2020-03-27T12:56:34.534978",
+    //       "platform_profile_id": "UCEyLTzBtHJhlUwkeWhxfMXw",
+    //       "platform_profile_name": "Peter Parker"
+    //     }
+    //   ],
+    //   "metadata": [
+    //     {
+    //       "offset": 0,
+    //       "limit": 10,
+    //       "from_date": "2020-12-31",
+    //       "to_date": "2021-12-31"
+    //     }
+    //   ]
+    // };
+console.log("incomeResponse?.data[0]",incomeResponse?.data[0]);
 
-    const incomeData = income.data[0]; 
+    const incomeData = incomeResponse?.data[0]; 
 
     // Check if income data exists
-    if (income?.data?.length > 0) {
+    if (incomeResponse?.data?.length > 0) {
       const platform = incomeData?.work_platform?.name; // Platform name from income data
       const queryPlatform = platformName; // Platform name from query params
     

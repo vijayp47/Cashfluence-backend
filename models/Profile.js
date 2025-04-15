@@ -20,19 +20,19 @@ const Profile = sequelize.define('Profile', {
   },
   income: {
     type: DataTypes.FLOAT,
-    allowNull: false, // Income should be mandatory
+    allowNull: false, 
   },
   idCard: {
     type: DataTypes.STRING,
-    allowNull: true, // Can be nullable since it's an optional file
+    allowNull: true, 
   },
   passport: {
     type: DataTypes.STRING,
-    allowNull: true, // Can be nullable since it's an optional file
+    allowNull: true, 
   },
   selfie: {
     type: DataTypes.STRING,
-    allowNull: true, // Can be nullable since it's an optional file
+    allowNull: true, 
   },
 });
 

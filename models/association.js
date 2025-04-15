@@ -6,7 +6,7 @@ const Transaction = require('./Transaction'); // Import Transaction model
 
 // ✅ Define Associations Here (After Models Are Imported)
 
-// User ↔ PlaidUser
+// User  PlaidUser
 User.hasOne(PlaidUser, {
   foreignKey: 'user_id',
   as: 'plaidUser',

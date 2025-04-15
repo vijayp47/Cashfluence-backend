@@ -3,7 +3,7 @@ const { DataTypes, NUMBER } = require('sequelize');
 
 const LiabilitiesData = sequelize.define('LiabilitiesData', {
     id: {
-      type: DataTypes.STRING, // Composite key based on user ID and liability type
+      type: DataTypes.STRING, 
       primaryKey: true,
     },
     user_id: {

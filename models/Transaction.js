@@ -29,7 +29,7 @@ const Transaction = sequelize.define("Transaction", {
     defaultValue: "pending",
   },
   payment_date: {
-    type: DataTypes.DATE,  // ✅ Store the payment date
+    type: DataTypes.DATE, 
     allowNull: false,
   },
   emi_no: {
@@ -41,7 +41,7 @@ const Transaction = sequelize.define("Transaction", {
   },
 }, {
   tableName: "transactions",
-  timestamps: false,  // Disable default createdAt/updatedAt fields
+  timestamps: false,
 });
 
 module.exports = Transaction;

@@ -1,271 +1,6 @@
-// // controllers/loanController.js
-// const messages = require('../constants/Messages');
-// const Loan = require('../models/Loan');
-// const User = require('../models/User'); // Include User model if needed
-// const dotenv = require("dotenv");
-// const nodemailer = require("nodemailer");
-// const fs = require('fs');
-// // Initialize environment variables from the .env file
-// dotenv.config();
-// const sendLoanApprovalEmail = (status,adminName ,userEmail,transactionId,userName,loanAmount,approvalDate,loanId) => {
-
-//   const transporter = nodemailer.createTransport({
-//     host: process.env.SMTP_HOST,
-//     port: process.env.SMTP_PORT,
-//     secure: false,
-//     auth: {
-//       user: process.env.SMTP_USER,
-//       pass: process.env.SMTP_PASSWORD,
-//     },
-//   });
-
-//   // Determine email content based on status
-//   let subject;
-//   let htmlContent;
-
-//   if (status === "Approved") {
-//     subject = "Loan Approval Confirmation";
-//     htmlContent = `
-//       <h1>Congratulations!</h1>
-//       <p>Your loan: ${loanId} has been approved by <strong>${adminName}</strong>.</p>
-//       <ul>
-//         <li><strong>Approval Date:</strong> ${approvalDate}</li>
-//         <li><strong>Transaction ID:</strong> ${transactionId}</li>
-//         <li><strong>Loan Amount:</strong> ${loanAmount}</li>
-//       </ul>
-//       <p>Thank you for choosing our services!</p>
-//     `;
-//   } else if (status === "Rejected") {
-//     subject = "Loan Application Rejection";
-//     htmlContent = `
-//       <h1>We're Sorry</h1>
-//       <p>Unfortunately, your loan application has been rejected.</p>
-//       <p>If you have any questions, please contact our support team.</p>
-//       <p>Thank you for considering our services!</p>
-//     `;
-//   } else {
-//     throw new Error("Invalid status provided. Must be 'approve' or 'reject'.");
-//   }
-
-//   const mailOptions = {
-//     from: process.env.SMTP_USER,
-//     to: userEmail,
-//     subject: subject,
-//     html: htmlContent,
-//   };
-
-//   return transporter.sendMail(mailOptions);
-// };
-
-// const sendLoanRejectEmail = (status,userEmail,loanId) => {
-
-//     const transporter = nodemailer.createTransport({
-//       host: process.env.SMTP_HOST,
-//       port: process.env.SMTP_PORT,
-//       secure: false,
-//       auth: {
-//         user: process.env.SMTP_USER,
-//         pass: process.env.SMTP_PASSWORD,
-//       },
-//     });
-
-//     // Determine email content based on status
-//     let subject;
-//     let htmlContent;
-
-//     subject = "Loan Application Rejection";
-//     htmlContent = `
-//       <h1>We're Sorry</h1>
-//       <p>Unfortunately, your loan: ${loanId} application has been rejected.</p>
-//       <p>If you have any questions, please contact our support team.</p>
-//       <p>Thank you for considering our services!</p>
-//     `;
-
-//     const mailOptions = {
-//       from: process.env.SMTP_USER,
-//       to: userEmail,
-//       subject: subject,
-//       html: htmlContent,
-//     };
-
-//     return transporter.sendMail(mailOptions);
-//   };
-
-// // Controller to handle loan application submission
-// const applyForLoan = async (req, res) => {
-//   try {
-//     const {
-//       amount,
-//       repaymentTerm,
-//       account,
-//       interest,
-//       loanrequested,
-//       riskLevel,
-//       riskScore,
-//       fromAccount, // fromAccount as a whole object
-//       toAccount,   // toAccount as a whole object
-//     } = req.body;
-
-//     // Create a loan application linked to the authenticated user
-//     const loanApplication = await Loan.create({
-//       amount,
-//       repaymentTerm,
-//       userId: req?.user?.userId,
-//       account,
-//       interest,
-//       status: 'Pending', // Default status for new loan applications
-//       loanrequested,
-//       riskLevel,
-//       riskScore,
-
-//       // Storing fromAccount and toAccount as entire objects
-//       fromAccount,  // Storing the entire fromAccount object
-//       toAccount,    // Storing the entire toAccount object
-//     });
-
-//     // Send response with the loan application details
-//     res.status(201).json({ success: true, loanApplication });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: "There was an error processing the loan application", error: error.message });
-//   }
-// };
-
-// // Controller to fetch all loan applications (Admin only)
-// const getAllLoans = async (req, res) => {
-//     try {
-//       const loans = await Loan.findAll({
-//         include: [
-//           {
-//             model: User,
-//             as: 'user', // Alias must match the association in Loan model
-//             attributes: ['firstName', 'lastName', 'email'], // Specify only the necessary fields
-//           },
-//         ],
-//       });
-//       res.json({ success: true, loans });
-//     } catch (error) {
-//       console.error(messages?.FAILED_TO_FETCH_LOAN, error);
-//       res.status(500).json({
-//         success: false,
-//         message: messages?.FAILED_TO_FETCH_LOAN,
-//         error: error.message,
-//       });
-//     }
-//   };
-
-//   const checkPendingPayments = async (req, res) => {
-//     try {
-//       const { loanId } = req.params; // Get loanId from request params
-
-//       // Mock loan data (replace with a database fetch in production)
-//       const loanData = {
-//         id: 12345,
-//         userId: req?.user?.userId, // Assuming userId comes from an authenticated user
-//         amount: 1200,
-//         status: "Pending",
-//         interestRate: 5.5,
-//         loanDate: "2024-01-15",
-//         approvedDate: "2024-01-20",
-//         dueDate: "2025-01-15",
-//         amountPending: 400,
-//         repaymentHistory: [
-//           { date: "2024-02-15", amountPaid: 200, emiDate: "2024-02-15", status: "Paid" },
-//           { date: "2024-03-15", amountPaid: 200, emiDate: "2024-03-15", status: "Paid" },
-//           { date: "2024-04-15", amountPaid: 200, emiDate: "2024-04-15", status: "Paid" },
-//           { date: "2024-05-15", amountPaid: 200, emiDate: "2024-05-15", status: "Pending" },
-//           { date: "2024-06-15", amountPaid: 200, emiDate: "2024-06-15", status: "Pending" },
-//         ],
-//       };
-
-//       // Check if any repayment status is pending
-//       const paymentPending = loanData.repaymentHistory.some(
-//         (repayment) => repayment.status === "Pending"
-//       );
-
-//       // Respond with userId and paymentPending status
-//       return res.status(200).json({
-//         success: true,
-//         userId: loanData.userId,
-//         paymentPending,
-//       });
-//     } catch (error) {
-//       console.error("Error checking pending payments:", error);
-//       return res.status(500).json({
-//         success: false,
-//         message: "Failed to check pending payments",
-//         error: error.message,
-//       });
-//     }
-//   };
-
-// // Controller to update the status of a loan application (Admin only)
-// const updateLoanStatus = async (req, res) => {
-
-//     try {
-//       const { id } = req.params; // Loan ID from URL params
-
-//       const { status,adminName ,userEmail,transactionId,userName,loanAmount,approvalDate,loanId } = req.body; // Status can be "Approved" or "Rejected"
-//  if (!status || !['Approved', 'Rejected'].includes(status)) {
-//         return res.status(400).json({ success: false, message: messages?.INVALID_STATUS});
-//       }
-
-//       // Find the loan by ID
-//       const loan = await Loan.findByPk(id);
-//       if (!loan) {
-//         return res.status(404).json({ success: false, message:messages?.LOAN_NOT_FOUND });
-//       }
-
-//       if (status == "Approved") {
-//         await sendLoanApprovalEmail(status,adminName ,userEmail,transactionId,userName,loanAmount,approvalDate,loanId);
-//       }
-
-//       if (status == "Rejected") {
-//         await sendLoanRejectEmail(status,userEmail,loanId);
-//       }
-
-//       // Update the loan status
-//       loan.status = status;
-//       await loan.save();
-
-//       res.status(200).json({ success: true, loan });
-//     } catch (error) {
-//       console.error(error); // Add detailed error logging to help debug
-//       res.status(500).json({ success: false, message: messages?.UPDATE_STATUS_FAILED, error: error.message });
-//     }
-//   };
-
-//   // Controller to get loan details (including status)
-// const getLoanDetails = async (req, res) => {
-//     try {
-//       const { id } = req.params; // Loan ID from URL params
-
-//       // Find the loan by ID
-//       const loan = await Loan.findByPk(id);
-//       if (!loan) {
-//         return res.status(404).json({ success: false, message: messages?.LOAN_NOT_FOUND });
-//       }
-
-//       res.status(200).json({ success: true, loan });
-//     } catch (error) {
-//       console.error(error);
-//       res.status(500).json({ success: false, message: messages?.LOAN_DETAIL_ERROR, error: error.message });
-//     }
-//   };
-
-// // Export the controller functions
-// module.exports = {
-//   applyForLoan,
-//   getAllLoans,
-//   updateLoanStatus,getLoanDetails,checkPendingPayments
-// };
-
-// controllers/loanController.js
-
 const messages = require("../constants/Messages");
 const Loan = require("../models/Loan");
-const User = require("../models/User"); 
-const { Op } = require("sequelize");
-const Transaction = require("../models/Transaction");
+const User = require("../models/User");
 const dotenv = require("dotenv");
 const nodemailer = require("nodemailer");
 const {
@@ -274,9 +9,6 @@ const {
 } = require("./stripeController");
 const schedule = require("node-schedule");
 const moment = require("moment");
-const fs = require("fs");
-const {  Sequelize } = require("sequelize");
-
 const {
   sendFineEmail,
   sendAdminAlert,
@@ -284,20 +16,14 @@ const {
 } = require("../config/emailServices");
 
 require("dotenv").config();
+dotenv.config();
 const { sequelize } = require("../config/db");
-const stripe = require("stripe")(
-  "sk_test_51QsM5MKGv97rduY5XuQLF5I6RTF6Xo3QPIPybmpJMbJXE1JFrehd21joSRpNtJVESgQ6vFqdWwCFyoIcG4PGJjU500xNty4f3i",
-  {
-    apiVersion: "2023-10-16", // Use a known working version
-  }
-);
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 // Initialize environment variables from the .env file
-dotenv.config();
 
 const sendLoanApprovalEmail = (
   status,
- 
   adminName,
   adminEmail,
   userEmail,
@@ -324,11 +50,11 @@ const sendLoanApprovalEmail = (
 
   if (status === "Approved") {
     const loanAmountNo = Number(loanAmount); // Ensure it's a number
-    const interestRateNo = Number(interestRate); 
-  
+    const interestRateNo = Number(interestRate);
+
     const interestAmount = (loanAmountNo * interestRateNo) / 100; // Calculate interest
     const totalPayableAmount = loanAmountNo + interestAmount; // Loan Amount + Interest
-   
+
     subject = `Loan #${loanId} Approval Confirmation`;
     htmlContent = `
       <h1>Congratulations!</h1>
@@ -444,8 +170,8 @@ const sendDueDateReminderEmail = async (
         ],
         mode: "payment",
         payment_intent_data: { capture_method: "automatic" },
-        success_url: `http://localhost:3000/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `http://localhost:3000/payment/cancel?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}&loan_id=${loanId}&emi_amount=${emiAmount}`,
+        success_url: `${process.env.BASE_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.BASE_URL}/payment/cancel?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}&loan_id=${loanId}&emi_amount=${emiAmount}`,
         metadata: {
           user_id: userId,
           loan_id: loanId,
@@ -488,15 +214,14 @@ const sendDueDateReminderEmail = async (
       <p>No further action is required.</p>`;
     }
 
-
-    if (daysLeft <= 0 ) {
+    if (daysLeft <= 0) {
       subject = `Loan EMI #${emiNo} Payment Due Today – Loan #${loanId}`;
-if(!isPaid){
-      message += `
+      if (!isPaid) {
+        message += `
       <p><strong>Your EMI payment is due today! Please make the payment as soon as possible to avoid penalties.</strong></p>
       <p><strong>Important:</strong> If the payment is not made by the due date, i.e., <strong>${dueDate}</strong>, a late fee of <strong>$50</strong> will be applied to your loan.</p>
       `;
-}
+      }
       console.log(`Checking if fine email is needed for EMI #${emiNo}`);
 
       // ✅ Check if payment exists after 30 min
@@ -511,8 +236,7 @@ if(!isPaid){
           loanId,
           emiNo
         );
- console.log("transactions------------",transactions);
- 
+
         if (transactions?.length === 0) {
           console.log(`⚠️ EMI #${emiNo} is still unpaid. Sending fine email.`);
 
@@ -521,17 +245,15 @@ if(!isPaid){
             { replacements: { userId }, type: sequelize.QueryTypes.SELECT }
           );
 
-
-        
-        // Extract the amount
+          // Extract the amount
           if (!userInfo || userInfo?.length === 0) {
             console.error(`❌ Error: No email found for User ID ${userId}`);
             return;
           }
 
           const userEmail = userInfo[0]?.email;
-        console.log("emiAmount",emiAmount);
-        
+          console.log("emiAmount", emiAmount);
+
           // ✅ Send fine email with correct user email
           await sendFineEmail(
             userName,
@@ -541,9 +263,19 @@ if(!isPaid){
             emiNo,
             emiAmount
           );
-          await Loan.update({ overdueStatus: "Overdue" }, { where: { id: loanId } });
+          await Loan.update(
+            { overdueStatus: "Overdue" },
+            { where: { id: loanId } }
+          );
           // ✅ Send Admin Alert
-          await sendAdminAlert(userId, loanId, emiNo,emiAmount,dueDate,adminEmail);
+          await sendAdminAlert(
+            userId,
+            loanId,
+            emiNo,
+            emiAmount,
+            dueDate,
+            adminEmail
+          );
           console.log("check--1");
 
           setTimeout(async () => {
@@ -570,8 +302,6 @@ if(!isPaid){
             }
           }, 30 * 60 * 1000);
         } else {
-          
-          
           console.log(`✅ EMI #${emiNo} is now paid. No fine email needed.`);
         }
       }, 2 * 60 * 1000); // ✅ Runs after 3 minute
@@ -597,120 +327,6 @@ if(!isPaid){
     console.error("❌ Error sending email:", error);
   }
 };
-
-
-
-// const sendDueDateReminderEmail = async (
-//   userEmail,
-//   userName,
-//   totalAmount,
-//   emiAmount,
-//   dueDate,
-//   loanId,
-//   userId,
-//   daysLeft,
-//   emiNo,
-//   totalEmis,
-//   adminEmail
-// ) => {
-//   try {
-//     const transporter = nodemailer.createTransport({
-//       host: process.env.SMTP_HOST,
-//       port: process.env.SMTP_PORT,
-//       secure: false,
-//       auth: {
-//         user: process.env.SMTP_USER,
-//         pass: process.env.SMTP_PASSWORD,
-//       },
-//     });
-//     const emiAmountCents = Math.round(parseFloat(emiAmount) * 100);
-//     let paymentUrl = "";
-
-//     const isPaid = await getTransactionByEmi(userId, loanId, emiNo);
-//     console.log(`🔍 EMI ${emiNo} Paid Status:`, isPaid);
-
-//     if (!isPaid) {
-//       const session = await stripe.checkout.sessions.create({
-//         payment_method_types: ["card"],
-//         line_items: [
-//           {
-//             price_data: {
-//               currency: "usd",
-//               product_data: { name: "Loan EMI Payment" },
-//               unit_amount: emiAmountCents,
-//             },
-//             quantity: 1,
-//           },
-//         ],
-//         mode: "payment",
-//         payment_intent_data: { capture_method: "automatic" },
-//         success_url: `http://localhost:3000/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-//         cancel_url: `http://localhost:3000/payment/cancel?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}&loan_id=${loanId}&emi_amount=${emiAmount}`,
-//         metadata: {
-//           user_id: userId,
-//           loan_id: loanId,
-//           emi_no: emiNo,
-//           totalEmis: totalEmis,
-//         },
-//       });
-//       paymentUrl = session.url;
-//     }
-
-//     let subject = `Loan EMI #${emiNo} Due Date Reminder – Loan #${loanId}`;
-//     let emailHeader = daysLeft <= 0 
-//       ? `<h2>EMI Payment Due Today. Loan #${loanId} </h2>`
-//       : `<h2>EMI Payment Reminder– Loan #${loanId} </h2>`;
-    
-//     let message = `<p>Dear ${userName},</p>
-//     <p>🔹 <strong>Loan ID:</strong> #${loanId}</p>
-//     <p>🔹 <strong>Total Loan Amount (including interest):</strong> $${totalAmount}</p>
-//     <p>🔹 <strong>EMI ${emiNo} of ${totalEmis} Amount:</strong> $${emiAmount}</p>
-//     <p>🔹 <strong>Due Date:</strong> ${dueDate}</p>`;
-
-//     if (!isPaid) {
-//       message += `<p><a href="${paymentUrl}" target="_blank">Click here to pay your EMI</a></p>`;
-//     } else {
-//       message += `<p><strong>You have already completed the payment successfully.</strong></p>`;
-//     }
-
-//     if (daysLeft <= 0 && !isPaid) {
-//       subject = `Loan EMI #${emiNo} Payment Due Today – Loan #${loanId}`;
-//       message += `<p><strong>Your EMI payment is due today! Please make the payment as soon as possible to avoid penalties.</strong></p>
-//       <p><strong>Important:</strong> If the payment is not made by the due date, a late fee of <strong>$50</strong> will be applied.</p>`;
-
-//       setTimeout(async () => {
-//         console.log(`🔍 Checking payment status for EMI #${emiNo} after 1 min`);
-//         const transactions = await getTransactionsByUserAndLoan(null, null, userId, loanId, emiNo);
-
-        
-        
-//         if (transactions.length === 0) {
-//           await sendFineEmail(userName, userEmail, userId, loanId, emiNo, emiAmount);
-//           await Loan.update({ overdueStatus: "Overdue" }, { where: { id: loanId } });
-//           await sendAdminAlert(userId, loanId, emiNo, emiAmount, dueDate, adminEmail);
-
-//           setTimeout(async () => {
-//             const stillUnpaid = !(await getTransactionByEmi(userId, loanId, emiNo));
-//             if (stillUnpaid) {
-//               await sendFineAdminAlert(userId, loanId, emiNo, emiAmount, dueDate, adminEmail, "Fine email was not paid within 30 minutes.");
-//             }
-//           }, 30  *  60 *  1000);
-//         }
-//       }, 2 *  60 *  1000);
-//     }
-
-//     const mailOptions = {
-//       from: process.env.SMTP_USER,
-//       to: userEmail,
-//       subject: subject,
-//       html: `${emailHeader}${message}`,
-//     };
-//     return transporter.sendMail(mailOptions);
-//   } catch (error) {
-//     console.error("❌ Error sending email:", error);
-//   }
-// };
-
 
 const scheduleDueDateEmails = (
   userEmail,
@@ -760,39 +376,6 @@ const scheduleDueDateEmails = (
   }
 };
 
-
-
-
-const getOverdueLoans = async (req, res) => {
-  try {
-    const today = new Date();
-
-    const overdueLoans = await Loan.findAll({
-      where: {
-        dueDate: { [Op.lt]: today }, // Loans where due date has passed
-        isLoanComplete: false, // Loan is not yet completed
-      },
-      include: [
-        {
-          model: User,
-          as: "user", // ✅ Explicitly specify the alias from Loan.belongsTo(User, { as: "user" })
-          attributes: [
-            [Sequelize.literal(`"user"."firstName" || ' ' || "user"."lastName"`), "userName"],
-            "email",
-          ],
-        },
-      ],
-    });
-console.log("overdueLoans",overdueLoans);
-
-    return res.status(200).json({ success: true, data: overdueLoans });
-  } catch (error) {
-    console.error("❌ Error fetching overdue loans:", error);
-    return res.status(500).json({ success: false, message: "Internal Server Error" });
-  }
-};
-
-
 const loanCompletedStatus = async (req, res) => {
   const loanId = req.params.loanId; // Get loanId from URL params
   const { isLoanComplete } = req.body; // Get the isLoanComplete status from request body
@@ -838,8 +421,8 @@ const applyForLoan = async (req, res) => {
       riskLevel,
       riskScore,
       fromAccount, // fromAccount as a whole object
-    
-      lastLoginAt
+
+      lastLoginAt,
     } = req.body;
     const submitTime = new Date(); // Current time
     let duration = null; // Default null if lastLoginAt is missing
@@ -851,9 +434,6 @@ const applyForLoan = async (req, res) => {
       }
     }
 
-    console.log("User lastLoginAt:", lastLoginAt);
-    console.log("Submit Time:", submitTime);
-    console.log("Duration (seconds):", duration);
 
     // Create a loan application linked to the authenticated user
     const loanApplication = await Loan.create({
@@ -964,17 +544,15 @@ const updateLoanStatus = async (req, res) => {
       } else if (status === "Rejected") {
         await sendLoanRejectEmail(status, userEmail, loanId);
       }
-       // ✅ Update loan status
-    loan.status = status;
-    await loan.save();
+      // ✅ Update loan status
+      loan.status = status;
+      await loan.save();
 
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: "Loan status updated successfully.",
-          loan,
-        });
+      res.status(200).json({
+        success: true,
+        message: "Loan status updated successfully.",
+        loan,
+      });
     } catch (emailError) {
       console.error("⚠ Email sending failed:", emailError);
       return res.status(500).json({
@@ -992,8 +570,6 @@ const updateLoanStatus = async (req, res) => {
     });
   }
 };
-
-
 
 // Controller to fetch all loan applications (Admin only)
 const getAllLoans = async (req, res) => {
@@ -1018,7 +594,7 @@ const getAllLoans = async (req, res) => {
   }
 };
 
-const loanDuration =async (req, res) => {
+const loanDuration = async (req, res) => {
   try {
     const data = await Loan.findAll({
       attributes: ["userId", "duration", "submitTime"],
@@ -1034,75 +610,68 @@ const loanDuration =async (req, res) => {
     });
   }
 };
-const checkPendingPayments = async (req, res) => {
+
+const getAllLoanOfSpecificUser = async (req, res) => {
   try {
-    const { loanId } = req.params; // Get loanId from request params
+    const { userId } = req.params;
 
-    // Mock loan data (replace with a database fetch in production)
-    const loanData = {
-      id: 12345,
-      userId: req?.user?.userId, // Assuming userId comes from an authenticated user
-      amount: 1200,
-      status: "Pending",
-      interestRate: 5.5,
-      loanDate: "2024-01-15",
-      approvedDate: "2024-01-20",
-      dueDate: "2025-01-15",
-      amountPending: 400,
-      repaymentHistory: [
-        {
-          date: "2024-02-15",
-          amountPaid: 200,
-          emiDate: "2024-02-15",
-          status: "Paid",
-        },
-        {
-          date: "2024-03-15",
-          amountPaid: 200,
-          emiDate: "2024-03-15",
-          status: "Paid",
-        },
-        {
-          date: "2024-04-15",
-          amountPaid: 200,
-          emiDate: "2024-04-15",
-          status: "Paid",
-        },
-        {
-          date: "2024-05-15",
-          amountPaid: 200,
-          emiDate: "2024-05-15",
-          status: "Pending",
-        },
-        {
-          date: "2024-06-15",
-          amountPaid: 200,
-          emiDate: "2024-06-15",
-          status: "Pending",
-        },
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    // Fetch user loans from the database
+    const loans = await Loan.findAll({
+      where: { userId }, // Assuming userId exists in the Loan model
+      attributes: [
+        'id', 'amount', 'interest', 'repaymentTerm', 'status', 'loanrequested', 
+        'riskLevel', 'riskScore', 'dueDate', 'overdueStatus', 'isLoanComplete',  
+        'submitTime', 'duration', 'createdAt'
       ],
-    };
-
-    // Check if any repayment status is pending
-    const paymentPending = loanData.repaymentHistory.some(
-      (repayment) => repayment.status === "Pending"
-    );
-
-    // Respond with userId and paymentPending status
-    return res.status(200).json({
-      success: true,
-      userId: loanData.userId,
-      paymentPending,
+      order: [['createdAt', 'DESC']], // Latest loans first
     });
+
+    // Check if loans exist
+    if (!loans.length) {
+      return res.status(404).json({ success: false, message: 'No loans found for this user' });
+    }
+
+    // Mask bank account details for security
+    const sanitizedLoans = loans.map(loan => ({
+      loanId: loan.id,
+      amount: loan.amount,
+      interest: loan.interest,
+      repaymentTerm: loan.repaymentTerm,
+      status: loan.status,
+      loanRequested: loan.loanrequested,
+      riskLevel: loan.riskLevel,
+      riskScore: loan.riskScore,
+      dueDate: loan.dueDate,
+      overdueStatus: loan.overdueStatus,
+      isLoanComplete: loan.isLoanComplete,
+      // fromAccount: loan.fromAccount ? maskAccount(loan.fromAccount) : null,
+      // toAccount: loan.toAccount ? maskAccount(loan.toAccount) : null,
+      submitTime: loan.submitTime,
+      duration: loan.duration,
+      createdAt: loan.createdAt,
+    }));
+
+    return res.status(200).json({ success: true, data: sanitizedLoans });
+
   } catch (error) {
-    console.error("Error checking pending payments:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to check pending payments",
-      error: error.message,
-    });
+    console.error('Error fetching loans:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
+
+const maskAccount = (account) => {
+  if (!account || !account.accountNumber) return account;
+  return {
+    ...account,
+    accountNumber: `****${account.accountNumber.slice(-4)}`, // Show only last 4 digits
+  };
+};
+
 
 // Controller to get loan details (including status)
 const getLoanDetails = async (req, res) => {
@@ -1128,17 +697,12 @@ const getLoanDetails = async (req, res) => {
   }
 };
 
-
-
-
-
-
 // Export the controller functions
 module.exports = {
   applyForLoan,
   getAllLoans,
   updateLoanStatus,
   getLoanDetails,
-  checkPendingPayments,
-  loanCompletedStatus,loanDuration,getOverdueLoans
+  loanCompletedStatus,
+  loanDuration,getAllLoanOfSpecificUser
 };

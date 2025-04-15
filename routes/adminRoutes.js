@@ -14,14 +14,11 @@ router.get('/dashboard', authenticateAdmin, adminDashboard);
 router.get('/users', authenticateAdmin, getUsersWithLoans);
 router.get('/allusers', authenticateAdmin, getAllUsersWithLoans);
 router.get('/filter-data',authenticateAdmin,getFilterData)
-
 router.post('/forgot-password',authenticateAdmin, forgotPassword);
-// Reset Password route (with token)
 router.post('/reset-password/:token',authenticateAdmin, resetPassword);
 router.get('/user/:userId',authenticateAdmin,getUserDataForStatus);
 router.get("/user-registrations",authenticateAdmin, getUserRegistrations);
 router.get('/loan-graph',authenticateAdmin,AdminGraphLoanDetails)
 router.get('/transaction-graph',authenticateAdmin,AdminTransactionGraphData)
-// /api/admin/profile
 module.exports = router;
 

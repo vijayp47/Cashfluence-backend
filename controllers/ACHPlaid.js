@@ -19,40 +19,8 @@ const createACHLinkToken = async (req, res) => {
   }
 };
 
-// Controller to exchange public token for access token
-const exchangePublicToken = async (req, res) => {
-  const { public_token } = req.body;
-  try {
-    const response = await plaidClient.itemPublicTokenExchange({ public_token });
-    res.json(response.data);
-  } catch (error) {
-    res.status(500).json({ error: error.response.data });
-  }
-};
-
-// Controller to create transfer authorization
-const createTransferAuthorization = async (req, res) => {
-  const { access_token, account_id } = req.body;
-  try {
-    const response = await plaidClient.transferAuthorizationCreate({
-      access_token,
-      type: 'credit',
-      network: 'ach',
-      amount: '12.34',
-      ach_class: 'ppd',
-      user: {
-        legal_name: 'John Doe',
-        email_address: 'johndoe@example.com',
-      },
-    });
-    res.json(response.data);
-  } catch (error) {
-    res.status(500).json({ error: error.response.data });
-  }
-};
 
 module.exports = {
   createACHLinkToken,
-  exchangePublicToken,
-  createTransferAuthorization,
+
 };

@@ -2,22 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser, authenticateAdmin } = require('../middleware/authMiddleware');
-const {applyForLoan,getAllLoans, updateLoanStatus, getLoanDetails,checkPendingPayments,loanCompletedStatus,loanDuration } = require('../controllers/loanController');
+const {applyForLoan,getAllLoans, updateLoanStatus, getLoanDetails,loanCompletedStatus,loanDuration,getAllLoanOfSpecificUser } = require('../controllers/loanController');
 
 // User route to submit a loan application
 router.post('/apply', authenticateUser, applyForLoan);
-
-// Admin route to get all loan applications
 router.get('/all', authenticateAdmin, getAllLoans);
-
-// Admin route to update loan status
 router.post('/:id', authenticateAdmin,updateLoanStatus);
-
-router.get('/:loanId/pending-status', checkPendingPayments);
 router.post('/loanstatus/:loanId', loanCompletedStatus);
-
-router.get("/loan-durations", loanDuration);
-
-// Admin route to get loan details by ID
+router.get("/loan-durations",authenticateUser, loanDuration);
 router.get('/:id', authenticateUser, getLoanDetails);
+router.get('/user/:userId', authenticateUser,getAllLoanOfSpecificUser);
 module.exports = router;

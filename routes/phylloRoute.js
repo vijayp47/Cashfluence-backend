@@ -14,9 +14,4 @@ router.get('/fetchDataFromdatabase',authenticateUser, fetchDataFromdatabase);
 router.get('/fetchDataFromdatabaseadmin',authenticateAdmin, fetchDataFromdatabaseAdmin);
 router.delete('/deletePlatformData', authenticateUser,deletePlatformData);
 router.get('/fetchStateAnnualPercentageRate', authenticateUser,fetchStateLawFromDatabase);
-// router.get('/risk-score',authenticateUser,getRiskScore);
-
-// router.get('/social/contents', getContent);
-// router.get('/social/comments', getComments);
-// router.get('/social/income/transactions', getSocialTrasactionOfParticularAccount);
 module.exports = router;
