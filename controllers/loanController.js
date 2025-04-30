@@ -57,19 +57,26 @@ const sendLoanApprovalEmail = (
 
     subject = `Loan #${loanId} Approval Confirmation`;
     htmlContent = `
-      <h1>Congratulations!</h1>
-      <p>Your loan: ${loanId} has been approved by <strong>${adminName}</strong>.</p>
-      <ul>
-        <li><strong>Approval Date:</strong> ${approvalDate}</li>
-        <li><strong>Transaction ID:</strong> ${transactionId}</li>
-        <li><strong>Loan Amount:</strong> $${loanAmountNo.toFixed(2)}</li>
-        <li><strong>Interest Amount:</strong> $${interestAmount.toFixed(2)}</li>
-        <li><strong>Total Payable Amount:</strong> $${totalPayableAmount.toFixed(
-          2
-        )}</li>
-      </ul>
-      <p>Thank you for choosing our services!</p>
-    `;
+    <h2>🎉 *Awesome news, ${userName}!* 🎉</h2>
+    <p>Your loan application has been officially approved, and the funds are on their way! You've taken a powerful step toward your goals—whether it's new gear, exciting collaborations, or growing your influencer reach. We’re excited to see what you accomplish next!</p>
+  
+    <ul style="list-style-type: none; padding: 0;">
+      <li><strong>Approval Date:</strong> ${approvalDate}</li>
+      <li><strong>Transaction ID:</strong> ${transactionId}</li>
+      <li><strong>Loan Amount:</strong> $${loanAmountNo.toFixed(2)}</li>
+      <li><strong>Interest Amount:</strong> $${interestAmount.toFixed(2)}</li>
+      <li><strong>Total Payable Amount:</strong> $${totalPayableAmount.toFixed(2)}</li>
+    </ul>
+  
+   
+  
+    <footer style="margin-top: 35px; font-size: 12px; color: #999;">
+  <p style="font-size: 15px; color: #555;">Stay amazing,</p>
+  <p style="font-size: 15px; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 0;">The CashFluence Team 💚</p>
+</footer>
+
+  `;
+  
   } else if (status === "Rejected") {
     subject = "Loan Application Rejection";
     htmlContent = `
@@ -183,146 +190,153 @@ const sendDueDateReminderEmail = async (
       paymentUrl = session.url;
     }
 
-    //Prepare Email Content
-    let subject = `Loan EMI #${emiNo} Due Date Reminder – Loan #${loanId}`;
-    let emailHeader;
-    if (daysLeft <= 0) {
-      emailHeader = `<h2>EMI Payment Due Today. Loan #${loanId} </h2>`;
-    } else {
-      emailHeader = `<h2>EMI Payment Reminder– Loan #${loanId} </h2>`;
-    }
 
-    let message = `<p>Dear ${userName},</p>`;
+  
+// Prepare Email Content
+let subject = `Loan EMI #${emiNo} Due Date Reminder – Loan #${loanId}`;
+let emailHeader;
+let message = "";
 
-    if (daysLeft <= 0) {
-      message += `<p>This is a friendly reminder that your EMI payment for your loan is due Today.</p>`;
-    } else {
-      message += `<p>This is a friendly reminder that your EMI payment for your loan is due soon.</p>`;
-    }
-    message = `
-    
-    <p>🔹 <strong>Loan ID:</strong> #${loanId}</p>
-    <p>🔹 <strong>Total Loan Amount (including interest):</strong> $${totalAmount}</p>
-    <p>🔹 <strong>EMI ${emiNo} of ${totalEmis} Amount:</strong> $${emiAmount}</p>
-    <p>🔹 <strong>Due Date:</strong> ${dueDate}</p>`;
+if (daysLeft <= 0 && !isPaid) {
+  emailHeader = `<h3>📅 *Today's the day, ${userName}!*</h3>`;
+  message += `<p>Your EMI payment is due today.</p>`;
+} else if(daysLeft >= 1){
+  emailHeader = `<h3>⏰ *Friendly Reminder, ${userName}!*</h3>`;
+  message += `<p>Your EMI payment is coming up soon! Staying ahead of your payments will help you continue to build a strong credit history and keep working toward your influencer goals. You've got this! And if you need any support, we're always here for you.</p>`;
+}
+else if(isPaid){
+  emailHeader = `<h3>✅ *Payment Received—You're Amazing, ${userName}!* ✅</h3>`;
+   message += ` <p>Just confirming that we've received your EMI payment. Great job staying ahead and keeping your influencer goals clearly in sight. You're on fire—keep crushing it!</p>
+ `
+ }
 
-    if (!isPaid) {
-      message += `<p><a href="${paymentUrl}" target="_blank">Click here to pay your EMI</a></p>
-      `;
-    } else {
-      message += `<p><strong>You have already completed the payment successfully.</strong></p>
-      <p>No further action is required.</p>`;
-    }
+// Adding Loan Information
+message += `
+  <p style="margin-bottom: -7px;">🔹 <strong>Loan ID:</strong> #${loanId}</p>
+  <p style="margin-bottom: -7px;">🔹 <strong>Total Loan Amount (including interest):</strong> $${totalAmount}</p>
+  <p style="margin-bottom: -7px;">🔹 <strong>EMI ${emiNo} of ${totalEmis} Amount:</strong> $${emiAmount}</p>
+  <p style="margin-bottom: -7px;">🔹 <strong>Due Date:</strong> ${dueDate}</p>`;
 
-    if (daysLeft <= 0) {
-      subject = `Loan EMI #${emiNo} Payment Due Today – Loan #${loanId}`;
-      if (!isPaid) {
-        message += `
-      <p><strong>Your EMI payment is due today! Please make the payment as soon as possible to avoid penalties.</strong></p>
-      <p><strong>Important:</strong> If the payment is not made by the due date, i.e., <strong>${dueDate}</strong>, a late fee of <strong>$50</strong> will be applied to your loan.</p>
-      `;
+if (!isPaid) {
+  message += `<p><a href="${paymentUrl}" target="_blank">Click here to pay your EMI</a></p>`;
+} else {
+  message += `
+  <p style="margin-top: 30px;">Proud of your progress,<br/>
+  The CashFluence Team 💚</p>`;
+}
+
+if (daysLeft <= 0) {
+  subject = `Loan EMI #${emiNo} Payment Due Today – Loan #${loanId}`;
+  if (!isPaid) {
+    message += `
+    <p> Paying on time helps you maintain a smooth and stress-free influencer journey. Thanks for staying awesome and organized—let’s keep up the momentum together!</p>
+    <p><strong>Important:</strong> If the payment is not made by the due date, i.e., <strong>${dueDate}</strong>, a late fee of <strong>$50</strong> will be applied to your loan.</p>
+  <p style="margin-top: 30px;"> Cheering you on,<br/>
+  The CashFluence Team 💚</p>`;
+  }
+  console.log(`Checking if fine email is needed for EMI #${emiNo}`);
+
+  // Check if payment exists after 30 min
+  setTimeout(async () => {
+    console.log(`Checking payment status for EMI #${emiNo} after 1 min`);
+
+    // Fetch transaction status
+    const transactions = await getTransactionsByUserAndLoan(
+      null,  // req
+      null,  // res
+      userId,
+      loanId,
+      emiNo
+    );
+
+    if (transactions?.length === 0) {
+      console.log(`EMI #${emiNo} is still unpaid. Sending fine email.`);
+
+      const userInfo = await sequelize.query(
+        `SELECT "email" FROM "Users" WHERE "id" = :userId`,
+        { replacements: { userId }, type: sequelize.QueryTypes.SELECT }
+      );
+
+      // Extract the amount
+      if (!userInfo || userInfo?.length === 0) {
+        console.error(`❌ Error: No email found for User ID ${userId}`);
+        return;
       }
-      console.log(`Checking if fine email is needed for EMI #${emiNo}`);
 
-      // ✅ Check if payment exists after 30 min
+      const userEmail = userInfo[0]?.email;
+      console.log("emiAmount", emiAmount);
+
+      // Send fine email with correct user email
+      await sendFineEmail(
+        userName,
+        userEmail,
+        userId,
+        loanId,
+        emiNo,
+        emiAmount
+      );
+      await Loan.update(
+        { overdueStatus: "Overdue" },
+        { where: { id: loanId } }
+      );
+      // Send Admin Alert
+      await sendAdminAlert(
+        userName,
+        userId,
+        loanId,
+        emiNo,
+        emiAmount,
+        dueDate,
+        adminEmail
+      );
+      console.log("check--1");
+
       setTimeout(async () => {
-        console.log(`🔍 Checking payment status for EMI #${emiNo} after 1 min`);
+        console.log("email sent to admin after 30 min ");
 
-        // ✅ Fetch transaction status
-        const transactions = await getTransactionsByUserAndLoan(
-          null,
-          null,
+        const stillUnpaid = !(await getTransactionByEmi(
           userId,
           loanId,
           emiNo
-        );
-
-        if (transactions?.length === 0) {
-          console.log(`⚠️ EMI #${emiNo} is still unpaid. Sending fine email.`);
-
-          const userInfo = await sequelize.query(
-            `SELECT "email" FROM "Users" WHERE "id" = :userId`,
-            { replacements: { userId }, type: sequelize.QueryTypes.SELECT }
+        ));
+        if (stillUnpaid) {
+          console.log(
+            `⚠️ EMI #${emiNo} fine email still unpaid. Sending another admin alert.`
           );
-
-          // Extract the amount
-          if (!userInfo || userInfo?.length === 0) {
-            console.error(`❌ Error: No email found for User ID ${userId}`);
-            return;
-          }
-
-          const userEmail = userInfo[0]?.email;
-          console.log("emiAmount", emiAmount);
-
-          // ✅ Send fine email with correct user email
-          await sendFineEmail(
+          await sendFineAdminAlert(
             userName,
-            userEmail,
-            userId,
-            loanId,
-            emiNo,
-            emiAmount
-          );
-          await Loan.update(
-            { overdueStatus: "Overdue" },
-            { where: { id: loanId } }
-          );
-          // ✅ Send Admin Alert
-          await sendAdminAlert(
             userId,
             loanId,
             emiNo,
             emiAmount,
             dueDate,
-            adminEmail
+            adminEmail,
+            "Fine email was not paid within 30 minutes."
           );
-          console.log("check--1");
-
-          setTimeout(async () => {
-            console.log(" email sent to admin after 30 min ");
-
-            const stillUnpaid = !(await getTransactionByEmi(
-              userId,
-              loanId,
-              emiNo
-            ));
-            if (stillUnpaid) {
-              console.log(
-                `⚠️ EMI #${emiNo} fine email still unpaid. Sending another admin alert.`
-              );
-              await sendFineAdminAlert(
-                userId,
-                loanId,
-                emiNo,
-                emiAmount,
-                dueDate,
-                adminEmail,
-                "Fine email was not paid within 30 minutes."
-              );
-            }
-          }, 30 * 60 * 1000);
-        } else {
-          console.log(`✅ EMI #${emiNo} is now paid. No fine email needed.`);
         }
-      }, 2 * 60 * 1000); // ✅ Runs after 3 minute
+      }, 30 * 60 * 1000);
+    } else {
+      console.log(`✅ EMI #${emiNo} is now paid. No fine email needed.`);
     }
+  }, 2 * 60 * 1000); // Runs after 2 minutes
 
-    message += `<p>Thank you for choosing Cashfluence. Feel free to contact our support team if you need any assistance!</p>
-    Best regards<br/>
-    Cashfluence Team`;
+} else {
+  message += `<p style="margin-top: 30px;"> Warm wishes,  <br/>
+  The CashFluence Team 💚</p>
+ `;
+}
 
-    // ✅ Send Email
-    const mailOptions = {
-      from: process.env.SMTP_USER,
-      to: userEmail,
-      subject: subject,
-      html: `${emailHeader}${message}`,
-    };
+// Send Email
+const mailOptions = {
+  from: process.env.SMTP_USER,
+  to: userEmail,
+  subject: subject,
+  html: `${emailHeader}${message}`,
+};
 
-    console.log(
-      `📧 Email sent to ${userEmail} for EMI #${emiNo} of ${totalEmis}`
-    );
-    return transporter.sendMail(mailOptions);
+console.log(`📧 Email sent to ${userEmail} for EMI #${emiNo} of ${totalEmis}`);
+return transporter.sendMail(mailOptions);
+
   } catch (error) {
     console.error("❌ Error sending email:", error);
   }

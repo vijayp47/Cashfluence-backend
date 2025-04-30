@@ -44,6 +44,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const messages = require("./constants/Messages");
 const paymentRoutes = require("./routes/paymentRoutes");
 const stripeRoutes = require("./routes/stripeRoutes");
+const weightRoutes = require("./routes/weightRoutes");
 
 // ✅ Ensure webhook request is NOT parsed as JSON
 app.use((req, res, next) => {
@@ -66,6 +67,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/stripe", stripeRoutes); 
 app.use("/api/plaid", plaidRoutes);
+app.use("/api/weight", weightRoutes);
 app.get("/payment/success", (req, res) => {
   res.sendFile(path.join(__dirname, "views/success.html"));
 });

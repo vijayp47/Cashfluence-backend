@@ -32,34 +32,34 @@ const stripeWebhook = async (req, res) => {
 };
 
 //  Get Transactions by User ID and Loan ID
-const getTransactionsByUserAndLoan = async (req = null, res = null, userId = null, loanId = null,
+const getTransactionsByUserAndLoan = async (req = null, res = null, userId, loanId,
   emiNo) => {
   try {
       // ✅ If called via API, extract from `req.query`
-      if (req) {
-          userId = req.query.user_id;
-          loanId = req.query.loan_id;
-          emiNo = req.query.emiNo;
+      if (req && req.query) {
+        console.log('req.query:', req.query);
+        userId = req.query.user_id || userId;
+        loanId = req.query.loan_id || loanId;
+        // emiNo = req.query.emi_no || emiNo;
       }
-
    
 
       // ✅ Validate Inputs
-      if (!userId || !loanId || !emiNo) {
+      if (!userId || !loanId ) {
           if (res) return res.status(400).json({ error: "user_id , loan_id and emi no are required" });
           return []; // Return empty array for internal calls
       }
 
       // ✅ Convert user_id & loan_id to String to match DB types
       userId = String(userId);
-      emiNo = Number(emiNo);
+      // emiNo = Number(emiNo);
       
 
       // ✅ Fetch transactions from database
       const transactions = await sequelize.query(
-          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS INTEGER) AND emi_no = CAST(:emiNo AS INTEGER)`,
+          `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS INTEGER) `,
           {
-              replacements: { userId, loanId ,emiNo},
+              replacements: { userId, loanId },
               type: sequelize.QueryTypes.SELECT,
           }
       );
@@ -99,7 +99,7 @@ const getTransactionByEmi = async (userId, loanId, emiNo, retries = 3, delay = 2
         SELECT * FROM transactions 
         WHERE user_id = :userId 
         AND loan_id = :loanId 
-        AND emi_no = CAST(:emiNo AS INTEGER) lo
+        AND emi_no = CAST(:emiNo AS INTEGER) 
         LIMIT 1
       `;
 

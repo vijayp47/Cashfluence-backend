@@ -409,10 +409,13 @@ const sendPasswordResetEmail = (email, token) => {
     to: email,
     subject: messages?.RESET,
     html: `
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetLink}">Reset your password</a>
-      <p>This link will expire in 15 minutes.</p>
-    `,
+    <p>Hey there! We heard you need a fresh password 🔑</p>
+    <p>No worries—just click the link below to reset your password securely:</p>
+    <p>
+      👉 <a href="${resetLink}" style="font-weight: bold; text-decoration: none;">Reset Your Password</a> 👈
+    </p>
+    <p>(This link expires in 15 minutes, so let’s get you back online!)</p>
+    <p>We've got your back, always.</p>`
   };
   return transporter.sendMail(mailOptions);
 };
@@ -690,7 +693,6 @@ const getUserDataForStatus = async (req, res) => {
     });
   }
 };
-
 
 const getUsersWithLoans = async (req, res) => {
   try {

@@ -17,7 +17,7 @@ dotenv.config();
 const baseUrl = process.env.baseUrl;
 
 // Helper function to send OTP email
-const sendOtpEmail = (email, otp) => {
+const sendOtpEmail = (name,email, otp) => {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
@@ -31,14 +31,29 @@ const sendOtpEmail = (email, otp) => {
   const mailOptions = {
     from: process.env.SMTP_USER,
     to: email,
-    subject: messages?.OTP_VERFICATION,
-    text: `Your OTP for account verification is: ${otp}. It expires in 10 minutes.`,
+    subject: messages?.OTP_VERFICATION || "Your CashFluence OTP is Here – Let’s Get You Started!",
+    html: `
+      <p>✨ <strong>Welcome Aboard, ${name}!</strong> ✨</p>
+      <p>
+        Here's your one-time password to quickly finish signing up: <strong>${otp}</strong><br/>
+        (Quick tip: This code expires in 10 minutes.)
+      </p>
+      <p>
+        We can't wait to see the incredible things you'll achieve. Let's do this!
+      </p>
+      <br/>
+      <p>
+        Your biggest fans, <br/>
+        <strong>The CashFluence Team 💚</strong><br/>
+       
+      </p>
+    `
   };
+  
 
   return transporter.sendMail(mailOptions);
 };
 
-// Register a new user
 // Register a new user
 const registerUser = async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
@@ -46,30 +61,42 @@ const registerUser = async (req, res) => {
   try {
     // Check if user already exists
     let user = await User.findOne({ where: { email } });
-    if (user) {
-      return res.status(400).json({ message: messages?.USER_EXIST });
-    }
 
     // Hash the password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Generate OTP
-    const otp = crypto.randomBytes(3).toString("hex"); // Generate a 6-digit OTP
-    const otpExpiration = Date.now() + 10 * 60 * 1000; // OTP valid for 10 minutes
+    const otp = crypto.randomBytes(3).toString("hex"); // 6-digit hex OTP
+    const otpExpiration = Date.now() + 10 * 60 * 1000; // 10 minutes validity
 
-    // Create the user with OTP details
-    user = await User.create({
-      firstName,
-      lastName,
-      email,
-      password: hashedPassword,
-      otp,
-      otpExpiration,
-    });
+    if (user) {
+      if (user.isVerified) {
+        // Already verified — reject signup
+        return res.status(400).json({ message: messages?.USER_EXIST });
+      } else {
+        // Not verified — update details (allow retry)
+        user.firstName = firstName;
+        user.lastName = lastName;
+        user.password = hashedPassword;
+        user.otp = otp;
+        user.otpExpiration = otpExpiration;
+        await user.save();
+      }
+    } else {
+      // User doesn't exist — create new
+      user = await User.create({
+        firstName,
+        lastName,
+        email,
+        password: hashedPassword,
+        otp,
+        otpExpiration,
+      });
+    }
 
     // Send OTP email
-    await sendOtpEmail(email, otp);
+    await sendOtpEmail(firstName,email, otp);
     return res.status(201).json({ message: messages?.USER_REGISTERED });
   } catch (err) {
     console.error(messages?.REGISTRATION_ERROR, err);
@@ -106,6 +133,41 @@ const verifyOtp = async (req, res) => {
     res.status(500).json({ message: messages?.OTP_VERIFICATION_ERROR });
   }
 };
+
+const resendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Find user by email
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(400).json({ message: messages?.USER_NOT_FOUND });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified." });
+    }
+
+    // Generate new OTP
+    const otp = crypto.randomBytes(3).toString("hex"); // Same as in register
+    const otpExpiration = Date.now() + 10 * 60 * 1000;
+
+    // Update user OTP fields
+    user.otp = otp;
+    user.otpExpiration = otpExpiration;
+    await user.save();
+
+    // Send the new OTP
+    await sendOtpEmail(email, otp);
+
+    res.status(200).json({ message: messages?.OTP_RESENT || "OTP resent successfully." });
+  } catch (err) {
+    console.error(messages?.OTP_RESEND_ERROR || "Error resending OTP:", err);
+    res.status(500).json({ message: messages?.OTP_RESEND_ERROR || "Failed to resend OTP." });
+  }
+};
+
 
 // Login a user
 const loginUser = async (req, res) => {
@@ -478,11 +540,20 @@ const sendPasswordResetEmail = (email, token) => {
     from: process.env.SMTP_USER,
     to: email,
     subject: messages?.RESET,
+    // html: `
+    //   <p>You requested a password reset. Click the link below to reset your password:</p>
+    //   <a href="${resetLink}">Reset your password</a>
+    //   <p>This link will expire in 15 minutes.</p>
+    // `,
+
     html: `
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetLink}">Reset your password</a>
-      <p>This link will expire in 15 minutes.</p>
-    `,
+  <p>Hey there! We heard you need a fresh password 🔑</p>
+  <p>No worries—just click the link below to reset your password securely:</p>
+  <p>
+    👉 <a href="${resetLink}" style="font-weight: bold; text-decoration: none;">Reset Your Password</a> 👈
+  </p>
+  <p>(This link expires in 15 minutes, so let’s get you back online!)</p>
+  <p>We've got your back, always.</p>`
   };
   return transporter.sendMail(mailOptions);
 };
@@ -596,6 +667,78 @@ const updateOneTimePaymentIdentityStatus = async (req, res) => {
     });
   }
 };
+const getTermsAcceptanceStatus = async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+
+    // Find user by ID
+    const user = await User.findOne({ where: { id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Return the termsAccepted status of the user
+    return res.status(200).json({
+      success: true,
+      termsAccepted: user.termsAccepted, // Return the termsAccepted status
+    });
+  } catch (error) {
+    console.error("Error fetching terms acceptance status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+
+const termsAcceptsStausUpdate = async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+
+    // Find user by ID
+    const user = await User.findOne({ where: { id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Update termsAccepted status
+    await User.update(
+      { termsAccepted: true }, // Set terms accepted true
+      { where: { id: userId } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Terms acceptance status updated successfully.",
+    });
+  } catch (error) {
+    console.error("Error updating terms acceptance status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 
 
 module.exports = {
@@ -603,5 +746,5 @@ module.exports = {
   loginUser,
   verifyOtp,
   forgotPassword,
-  resetPassword,contactSupport,changePassword,handleOTPAndUserProfileUpdate,upload,getUserProfile,updateOneTimePaymentIdentityStatus
+  resetPassword,contactSupport,getTermsAcceptanceStatus,termsAcceptsStausUpdate,changePassword,handleOTPAndUserProfileUpdate,resendOtp,upload,getUserProfile,updateOneTimePaymentIdentityStatus
 };

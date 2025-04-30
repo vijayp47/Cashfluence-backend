@@ -368,7 +368,9 @@ const idvPlaidToken = async (req, res, next) => {
       products: ["identity_verification"],
       identity_verification: {
         template_id: TEMPLATE_ID, // Use the template ID
+      
       },
+    
       country_codes: ["US"],
       language: "en",
     });
@@ -557,7 +559,7 @@ const plaidIDVComplete = async (req, res, next) => {
 
     const sessionId = metadata.link_session_id;
 
-    // ✅ Fetch Regulatory Requirements using sessionId
+    //Fetch Regulatory Requirements using sessionId
     const response = await plaidClient.identityVerificationGet({
       identity_verification_id: sessionId, // Make sure this is the correct ID
     });
@@ -1098,7 +1100,7 @@ const deleteBankDetails = async (req, res) => {
   }
 
   try {
-    // 🔍 Debug: Find accounts before deletion
+    //Debug: Find accounts before deletion
     const accounts = await Account.findAll({ where: { userId, institution_id: institutionId } });
     console.log("Accounts found before deletion:", accounts);
 
@@ -1109,24 +1111,24 @@ const deleteBankDetails = async (req, res) => {
     // Extract accountIds
     const accountIds = accounts.map(account => account.accountId);
 
-    // 🔥 Delete related records before deleting accounts
+    // Delete related records before deleting accounts
     await Balances.destroy({ where: { accountId: accountIds } });
     await Mortgage.destroy({ where: { accountId: accountIds } });
     await StudentLoan.destroy({ where: { accountId: accountIds } });
     await Credit.destroy({ where: { accountId: accountIds } });
 
-    // 🔥 Delete accounts (Ensure Sequelize deletes them properly)
+    // Delete accounts (Ensure Sequelize deletes them properly)
     const deleted = await Account.destroy({ where: { userId, institution_id: institutionId } });
 
-    // 🚨 Check if deletion actually happened
+    // Check if deletion actually happened
     if (deleted === 0) {
       return res.status(500).json({ error: "Account deletion failed!" });
     }
 
-    console.log("✅ Bank and all associated accounts deleted successfully.");
+    console.log("Bank and all associated accounts deleted successfully.");
     return res.status(200).json({ message: "Bank and all associated accounts deleted successfully" });
   } catch (error) {
-    console.error("❌ Error deleting bank details:", error);
+    console.error("Error deleting bank details:", error);
     return res.status(500).json({ error: "Server error" });
   }
 };
@@ -1139,31 +1141,31 @@ const deleteAccountDetails = async (req, res) => {
   }
 
   try {
-    // 🔍 Debug: Check if account exists before deleting
+    // Debug: Check if account exists before deleting
     const account = await Account.findOne({ where: { accountId, userId } });
 
     if (!account) {
       return res.status(404).json({ error: "Account not found or unauthorized" });
     }
 
-    // 🔥 Delete related records first
+    // Delete related records first
     await Balances.destroy({ where: { accountId } });
     await Mortgage.destroy({ where: { accountId } });
     await StudentLoan.destroy({ where: { accountId } });
     await Credit.destroy({ where: { accountId } });
 
-    // 🔥 Delete the main account
+    // Delete the main account
     const deleted = await Account.destroy({ where: { accountId, userId } });
 
-    // 🚨 Check if deletion happened
+    // Check if deletion happened
     if (deleted === 0) {
       return res.status(500).json({ error: "Account deletion failed!" });
     }
 
-    console.log("✅ Account deleted successfully.");
+    console.log("Account deleted successfully.");
     return res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
-    console.error("❌ Error deleting account:", error);
+    console.error("Error deleting account:", error);
     return res.status(500).json({ error: "Server error" });
   }
 };
