@@ -1,8 +1,8 @@
 {
   "development": {
     "username": "postgres",
-    "password": "postgres",
-    "database": "cashfluence",
+    "password": "pg1234",
+    "database": "cash",
     "host": "127.0.0.1",
     "dialect": "postgres"
   },

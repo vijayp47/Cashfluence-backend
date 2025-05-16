@@ -18,7 +18,7 @@ const {
   plaidIDVComplete,
   PlaidResetIdv,
   getpliadUserIdvStauts,
-  prefillUserData,getPlaidUserState,getAverageBalance,deleteAccountDetails,deleteBankDetails,fetchRegultoryData
+  prefillUserData,getPlaidUserState,getAverageBalance,deleteAccountDetails,deleteBankDetails,fetchRegultoryData,getPlaidProcessTokenByUserId,getIdentityDataByAccountId
 } = require('../controllers/plaidController');
 
 
@@ -45,6 +45,8 @@ router.post('/ach_create_link_token', createACHLinkToken);
 router.post('/average-balance', authenticateUser, getAverageBalance);
 router.delete('/delete-account', authenticateUser, deleteAccountDetails);
 router.delete('/delete-bank', authenticateUser, deleteBankDetails);
+router.get('/plaid-user/:user_id/process-token', authenticateUser, getPlaidProcessTokenByUserId);
+router.get('/account/:accountId/identity-data', authenticateUser, getIdentityDataByAccountId);
 // router.get('/regulatory-requirements/:sessionId',fetchRegultoryData)
 
 module.exports = router;

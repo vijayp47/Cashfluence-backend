@@ -35,27 +35,27 @@ const stripeWebhook = async (req, res) => {
 const getTransactionsByUserAndLoan = async (req = null, res = null, userId, loanId,
   emiNo) => {
   try {
-      // ✅ If called via API, extract from `req.query`
+      // If called via API, extract from `req.query`
       if (req && req.query) {
-        console.log('req.query:', req.query);
+    
         userId = req.query.user_id || userId;
         loanId = req.query.loan_id || loanId;
         // emiNo = req.query.emi_no || emiNo;
       }
    
 
-      // ✅ Validate Inputs
+      // Validate Inputs
       if (!userId || !loanId ) {
           if (res) return res.status(400).json({ error: "user_id , loan_id and emi no are required" });
           return []; // Return empty array for internal calls
       }
 
-      // ✅ Convert user_id & loan_id to String to match DB types
+      // Convert user_id & loan_id to String to match DB types
       userId = String(userId);
       // emiNo = Number(emiNo);
       
 
-      // ✅ Fetch transactions from database
+      // Fetch transactions from database
       const transactions = await sequelize.query(
           `SELECT * FROM transactions WHERE user_id = CAST(:userId AS VARCHAR) AND loan_id = CAST(:loanId AS INTEGER) `,
           {
@@ -64,22 +64,21 @@ const getTransactionsByUserAndLoan = async (req = null, res = null, userId, loan
           }
       );
 
-      console.log("transactions------------", transactions);
 
-      // ✅ If No Transactions Found
+      // If No Transactions Found
       if (transactions.length === 0) {
           if (res) return res.status(404).json({ message: "No transactions found" });
           return []; // Return empty array for internal calls
       }
 
-      // ✅ If called via API, send JSON response
+      // If called via API, send JSON response
       if (res) {
           return res.status(200).json({ success: true, data: transactions });
       }
 
       return transactions; // Return transactions for internal calls
   } catch (error) {
-      console.error("❌ Error fetching transactions:", error);
+      console.error("Error fetching transactions:", error);
       if (res) return res.status(500).json({ error: "Internal Server Error" });
       return []; // Return empty array if error
   }
@@ -90,7 +89,7 @@ const getTransactionsByUserAndLoan = async (req = null, res = null, userId, loan
 const getTransactionByEmi = async (userId, loanId, emiNo, retries = 3, delay = 2000) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log("🔍 Query Debug:", {
+      console.log("Query Debug:", {
         userIdType: typeof userId, loanIdType: typeof loanId, emiNoType: typeof emiNo,
         userIdValue: `"${userId}"`, loanIdValue: `"${loanId}"`, emiNoValue: emiNo
       });
@@ -103,12 +102,7 @@ const getTransactionByEmi = async (userId, loanId, emiNo, retries = 3, delay = 2
         LIMIT 1
       `;
 
-      console.log(`🟢 Running SQL Query: ${sqlQuery}`);
-      console.log(`🟢 With Parameters:`, { 
-        userId: String(userId).trim(), 
-        loanId: String(loanId).trim(), 
-        emiNo: Number(emiNo) // Ensure emiNo is an integer
-      });
+    
 
       const transaction = await sequelize.query(sqlQuery, {
         replacements: { 
@@ -119,26 +113,25 @@ const getTransactionByEmi = async (userId, loanId, emiNo, retries = 3, delay = 2
         type: sequelize.QueryTypes.SELECT,
       });
 
-      console.log(`🔍 SQL Result:`, transaction);
 
       if (transaction.length > 0) {
-        console.log("✅ Transaction Found:", transaction);
+        console.log("Transaction Found:", transaction);
         return true; // Transaction exists
       } else {
-        console.log("❌ No Matching Transaction Found!");
+        console.log("No Matching Transaction Found!");
       }
 
       if (attempt < retries) {
-        console.log(`🔄 Retrying in ${delay / 1000} seconds...`);
+        console.log(`Retrying in ${delay / 1000} seconds...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     } catch (error) {
-      console.error(`❌ SQL Error:`, error);
+      console.error(`SQL Error:`, error);
       return false;
     }
   }
 
-  console.log("⚠️ Returning FALSE after all attempts");
+  console.log("Returning FALSE after all attempts");
   return false;
 };
 
@@ -157,7 +150,7 @@ const checkTransaction = async (req, res) => {
 
     return res.json({ success: true, transactionExists });
   } catch (error) {
-    console.error("❌ Error handling check-transaction route:", error);
+    console.error("Error handling check-transaction route:", error);
     return res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 };

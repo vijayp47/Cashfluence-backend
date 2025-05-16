@@ -13,7 +13,6 @@ const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
 const PLAID_SECRET = process.env.PLAID_SECRET;
 
 const PLAID_ENV = process.env.PLAID_ENV;
-console.log("TEMPLATE_ID", TEMPLATE_ID);
 
 // Function to create link token
 const createLinkToken = async (req, res) => {
@@ -23,7 +22,7 @@ const createLinkToken = async (req, res) => {
         client_user_id: "unique_user_id",
       },
       client_name: "Cashfluence",
-      products: ["liabilities"], // products as needed
+      products: ["liabilities",'auth'], 
       country_codes: ["US"],
       language: "en",
     });
@@ -52,6 +51,7 @@ const plaidPublicToken = async (req, res) => {
     });
 
     const accessToken = response.data.access_token;
+
     const itemId = response.data.item_id;
 
     // Return the access token and item ID to the frontend
@@ -261,6 +261,41 @@ const getLiabilities = async (req, res) => {
         details: error.response ? error.response.data : error.message,
       });
   }
+
+const identityResponse = await plaidClient.identityGet({
+  access_token: accessToken,
+});
+const identityData = identityResponse.data;
+
+for (const account of identityData.accounts) {
+  const owner = (account.owners || [])[0]; // First owner
+
+  if (owner) {
+    const name = owner.names?.[0] || null;
+
+    const primaryEmail = owner.emails?.find(e => e.primary)?.data || null;
+    const primaryAddress = owner.addresses?.find(a => a.primary)?.data || null;
+    let primaryPhone = null;
+
+if (owner.phone_numbers?.length) {
+  const primary = owner.phone_numbers.find(p => p.primary);
+  primaryPhone = (primary || owner.phone_numbers[0])?.data || null;
+}
+
+    const identityPayload = {
+      name,
+      email: primaryEmail,
+      address: primaryAddress,
+      phone_number: primaryPhone,
+    };
+    await Account.update(
+      { identity_data: identityPayload },
+      { where: { accountId: account.account_id } }
+    );
+  }
+}
+
+
 };
 
 // Controller function to handle the risk score request
@@ -297,9 +332,6 @@ const getRiskScoreController = async (req, res) => {
           mortgage: response?.data?.liabilities?.mortgage || [],
           accounts: response?.data?.accounts || [],
         };
-
-        console.log("liabilitiesData-------------",liabilitiesData);
-        
 
         // Calculate risk score for the current access token
         const riskData = riskService.getRiskScore(liabilitiesData);
@@ -466,13 +498,6 @@ const updateUserRecordForIDVSession = async (idvSession, userId) => {
       devices: risk_check?.devices,
       identity_abuse_signals: risk_check?.identity_abuse_signals,
     };
-
-    console.log(
-      "documentaryVerificationDetails",
-      documentaryVerificationDetails
-    );
-    console.log("riskCheckDetails", riskCheckDetails);
-    console.log("selfieCheckDetails", selfieCheckDetails);
 
     // Check if user exists in the database
     const userExists = await PlaidUser.findOne({ where: { user_id: userId } });
@@ -789,7 +814,7 @@ const getUserDataFromDatabase = async (user_id) => {
     const userData = await User.findOne({
       where: { id: user_id },
     });
-    // console.log("userData....",userData)
+    
 
     if (!userData) {
       return res.status(404).json({ message: "User not found" });
@@ -949,7 +974,7 @@ const getUserAccountData = async (req, res) => {
 
     if (!accounts.length) {
       return res
-        .status(404)
+        .status(204)
         .json({ message: "No accounts found for the given user." });
     }
 
@@ -1169,6 +1194,52 @@ const deleteAccountDetails = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
+const getPlaidProcessTokenByUserId = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const user = await PlaidUser.findOne({
+      where: { user_id },
+      attributes: ['plaid_process_token']
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ plaid_process_token: user.plaid_process_token });
+  } catch (error) {
+    console.error('Error fetching plaid_process_token:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+const getIdentityDataByAccountId = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+
+    if (!accountId) {
+      return res.status(400).json({ error: 'accountId is required' });
+    }
+
+    const account = await Account.findOne({
+      where: { accountId },
+      attributes: ['identity_data'],
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    return res.json({ identity_data: account.identity_data });
+  } catch (error) {
+    console.error('Error fetching identity_data:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 
 
@@ -1189,5 +1260,6 @@ module.exports = {
   getPlaidUserState,
   getAverageBalance,
   deleteAccountDetails,
-  deleteBankDetails
+  deleteBankDetails,
+  getPlaidProcessTokenByUserId,getIdentityDataByAccountId
 };

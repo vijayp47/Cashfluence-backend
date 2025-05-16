@@ -16,5 +16,28 @@ const configuration = new Configuration({
 });
 
 const plaidClient = new PlaidApi(configuration);
-module.exports = { plaidClient };
+
+
+
+async function createStraddleProcessorToken(accessToken, accountId) {
+  try {
+    const response = await plaidClient.processorTokenCreate({
+      access_token: accessToken,
+      account_id: accountId,
+      processor: 'straddle',
+    });
+
+    const processorToken = response.data.processor_token;
+    console.log('Processor Token:', processorToken);
+    return processorToken;
+  } catch (error) {
+    console.error('Failed to create processor token:', error.response?.data || error.message);
+    throw new Error('Could not generate processor token');
+  }
+}
+
+
+
+
+module.exports = { plaidClient ,createStraddleProcessorToken, };
 

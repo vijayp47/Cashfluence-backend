@@ -45,8 +45,8 @@ const messages = require("./constants/Messages");
 const paymentRoutes = require("./routes/paymentRoutes");
 const stripeRoutes = require("./routes/stripeRoutes");
 const weightRoutes = require("./routes/weightRoutes");
-
-// ✅ Ensure webhook request is NOT parsed as JSON
+const recipientRoutes =require("./routes/recipientRoutes");
+// Ensure webhook request is NOT parsed as JSON
 app.use((req, res, next) => {
   if (req.originalUrl === "/api/stripe/webhook") {
     next(); // Skip body-parser for webhook
@@ -68,6 +68,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/stripe", stripeRoutes); 
 app.use("/api/plaid", plaidRoutes);
 app.use("/api/weight", weightRoutes);
+app.use('/api/recipient', recipientRoutes);
 app.get("/payment/success", (req, res) => {
   res.sendFile(path.join(__dirname, "views/success.html"));
 });
@@ -85,29 +86,21 @@ app.get("/payment/cancel", (req, res) => {
 
 app.get("/retry-payment", async (req, res) => {
   let { session_id, loan_id, emi_amount, user_id } = req.query; // ✅ Extract user_id
-  console.log("emi_amount", emi_amount);
 
   if (!session_id || !loan_id || !user_id) {
     return res.status(400).json({ error: "Missing session_id, loan_id, or user_id" });
   }
 
   try {
-    console.log("🔄 Retrieving Stripe session:", session_id);
 
-    // ✅ Retrieve existing Stripe session
+    // Retrieve existing Stripe session
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
     if (session && session.payment_status === "unpaid") {
-      console.log("✅ Redirecting to existing session:", session.url);
       return res.redirect(session.url);
     }
-
-    console.log("⚠️ Session expired. Creating a new session...");
-
     const emiAmountCents = emi_amount ? parseFloat(emi_amount) * 100 : 5000;
-    console.log("✅ Final EMI Amount (cents):", emiAmountCents);
-
-    // ✅ Create a new checkout session
+   //  Create a new checkout session
     const newSession = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -123,19 +116,41 @@ app.get("/retry-payment", async (req, res) => {
       mode: "payment",
       success_url:`${process.env.BASE_URL}/payment/success?session_id=${newSession.id}&loan_id=${loan_id}&user_id=${user_id}`,
       cancel_url:`${process.env.BASE_URL}/payment/cancel?loan_id=${loan_id}&emiAmount=${emi_amount}`,
-      metadata: { user_id, loan_id }, // ✅ Include user_id
+      metadata: { user_id, loan_id }, //  Include user_id
     });
 
-    console.log("✅ New session created:", newSession.url);
+    console.log("New session created:", newSession.url);
 
     return res.redirect(newSession.url);
   } catch (error) {
-    console.error("❌ Error in retry-payment:", error);
+    console.error("Error in retry-payment:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 
+
+app.post('/straddle-payoutstatus-webhook', (req, res) => {
+  console.log('Webhook received!');
+  console.log('Headers:', req.headers);
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+
+  // Example: Extract payout status
+  const payoutStatus = req.body.data?.status;
+  const payoutId = req.body.data?.id;
+
+  console.log(`Payout ID: ${payoutId}, Status: ${payoutStatus}`);
+
+  // Respond with 200 OK to acknowledge receipt
+  res.status(200).send('Webhook received');
+});
+
+
+app.post('/straddle-webhook', (req, res) => {
+    console.log("Webhook payload received:");
+    console.log(JSON.stringify(req.body, null, 2)); // Pretty print the data
+    res.status(200).send('OK');
+});
 
 
 // Error handling middleware

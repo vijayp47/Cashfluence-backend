@@ -33,6 +33,8 @@ const WeightConfig = sequelize.define("WeightConfig", {
   save_count: { type: DataTypes.INTEGER, defaultValue: 15 },
   impression_organic_count: { type: DataTypes.INTEGER, defaultValue: 10 },
   reach_organic_count: { type: DataTypes.INTEGER, defaultValue: 10 },
+  tweet_count: { type: DataTypes.INTEGER, defaultValue: 10 },
+  retweet_count:  { type: DataTypes.INTEGER, defaultValue: 10 },
 }, {
   tableName: "weight_config",
   timestamps: false,

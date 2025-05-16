@@ -1,8 +1,7 @@
 const nodemailer = require("nodemailer");
-const stripe = require("stripe")(
-    "sk_test_51QsM5MKGv97rduY5XuQLF5I6RTF6Xo3QPIPybmpJMbJXE1JFrehd21joSRpNtJVESgQ6vFqdWwCFyoIcG4PGJjU500xNty4f3i"
-  );
-// ✅ Email Transporter
+require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
+// Email Transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
@@ -13,7 +12,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ✅ Send Fine Email
+//  Send Fine Email
 const sendFineEmail = async (userName,userEmail, userId, loanId, emiNo, emiAmount) => {
     try {
         const fineAmount = 50;
@@ -21,9 +20,9 @@ const sendFineEmail = async (userName,userEmail, userId, loanId, emiNo, emiAmoun
 
         const totalAmountCents = Math.round(totalAmount * 100);
 
-        console.log(`💰 Fine applied: $${fineAmount} | Total Payable: $${totalAmount}`);
+        console.log(`Fine applied: $${fineAmount} | Total Payable: $${totalAmount}`);
 
-        // ✅ Create Stripe Payment Link (valid for 1 min)
+        // Create Stripe Payment Link (valid for 1 min)
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
             line_items: [{
@@ -36,22 +35,22 @@ const sendFineEmail = async (userName,userEmail, userId, loanId, emiNo, emiAmoun
             }],
             mode: "payment",
             payment_intent_data: { capture_method: "automatic" },
-            success_url: `http://localhost:3000/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `http://localhost:3000/payment/cancel?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}&loan_id=${loanId}&emi_amount=${emiAmount}`,
+            success_url: `${process.env.BASE_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.BASE_URL}/payment/cancel?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}&loan_id=${loanId}&emi_amount=${emiAmount}`,
             metadata: { user_id: userId, loan_id: loanId, emi_no: emiNo },
-            expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // ✅ 30-Minute Expiry 
+            expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30-Minute Expiry 
 
         });
 
         const paymentUrl = session.url;
 
-        // ✅ Ensure userEmail is not empty before sending email
+        // Ensure userEmail is not empty before sending email
         if (!userEmail) {
-            console.error(`❌ Error: No email provided for EMI #${emiNo}`);
+            console.error(`Error: No email provided for EMI #${emiNo}`);
             return;
         }
 
-        // ✅ Send Email with Fine Details
+        // Send Email with Fine Details
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST,
             port: process.env.SMTP_PORT,
@@ -62,14 +61,27 @@ const sendFineEmail = async (userName,userEmail, userId, loanId, emiNo, emiAmoun
             },
         });
 
+
+
         const subject = `🚨 Fine Applied: EMI #${emiNo} Overdue Payment`;
-        const message = `<p>Dear ${userName}</p>
-                         <p>Your EMI <strong>#${emiNo}</strong> for Loan <strong>#${loanId}</strong> was due.</p>
-                         <p><strong>EMI Amount:</strong> $${emiAmount}</p>
-                         <p><strong>Late Fee Applied:</strong> $${fineAmount}</p>
-                         <p><strong>Total Payable Amount:</strong> $${totalAmount}</p>
-                         <p><a href="${paymentUrl}" target="_blank">Click here to pay now</a></p>
-                         <p><strong>⚠️ This payment link is valid for 30 minute.</strong></p>`;
+        const message = `<p><strong>⚠️ Heads Up, ${userName}!</strong></p>
+<p>Looks like your last payment came in late, so a small penalty was applied. We totally get it—life happens! Let’s get back on track and keep you moving toward your influencer goals without a hitch. Reach out if you need help sorting this out; we're always here for you.</p>
+
+<p><strong>EMI Amount:</strong> $${emiAmount}</p>
+<p><strong>Late Fee Applied:</strong> $${fineAmount}</p>
+<p><strong>Total Payable Amount:</strong> $${totalAmount}</p>
+
+<p><a href="${paymentUrl}" target="_blank">Click here to pay now</a></p>
+<p><strong>⚠️ This payment link is valid for 30 minutes.</strong></p>
+
+
+
+
+<footer style="margin-top: 35px; font-size: 12px; color: #999;">
+  <p style="font-size: 15px; color: #555;">Supporting your success,</p>
+  <p style="font-size: 15px; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 0;">The CashFluence Team 💚</p>
+</footer>
+`;
 
         const mailOptions = {
             from: process.env.SMTP_USER,
@@ -79,28 +91,38 @@ const sendFineEmail = async (userName,userEmail, userId, loanId, emiNo, emiAmoun
         };
 
         await transporter.sendMail(mailOptions);
-        console.log(`📧 Fine email sent for EMI #${emiNo} - Loan #${loanId}`);
+        console.log(`Fine email sent for EMI #${emiNo} - Loan #${loanId}`);
     } catch (error) {
-        console.error("❌ Error sending fine email:", error);
+        console.error("Error sending fine email:", error);
     }
 };
 
 
-// ✅ Send Admin Alert for Overdue EMI
-const sendAdminAlert = async (userId, loanId, emiNo, emiAmount, dueDate,adminEmail) => {
+// Send Admin Alert for Overdue EMI
+const sendAdminAlert = async (userName,userId, loanId, emiNo, emiAmount, dueDate,adminEmail) => {
   try {
-    const subject = `🚨 Urgent: Overdue EMI Alert - Loan #${loanId} (EMI #${emiNo})`;
+    const subject = ` *Action Needed: Overdue EMI Alert for ${userName}* `;
     
     const message = `
-      <h2>🚨 Overdue EMI Alert</h2>
-      <p><strong>User ID:</strong> ${userId}</p>
-      <p><strong>Loan ID:</strong> #${loanId}</p>
-      <p><strong>EMI Number:</strong> #${emiNo}</p>
-      <p><strong>EMI Amount:</strong> $${emiAmount}</p>
-      <p><strong>Due Date:</strong> ${dueDate}</p>
-      <p style="color: red;"><strong>⚠️ Immediate action is required! The EMI payment has not been received.</strong></p>
-      <p>Please take the necessary steps to follow up with the user.</p>
-    `;
+  <h2> Overdue EMI Alert</h2>
+  <p>Just a quick admin heads-up: <strong>${userName}</strong> has an overdue EMI payment.<br/>
+   Let’s kindly follow up to help them get caught up and back on track toward their influencer dreams.</p>
+
+  <ul style="list-style-type: none; padding: 0;">
+    <li><strong>User ID:</strong> ${userId}</li>
+    <li><strong>Loan ID:</strong> #${loanId}</li>
+    <li><strong>EMI Number:</strong> #${emiNo}</li>
+    <li><strong>EMI Amount:</strong> $${emiAmount}</li>
+    <li><strong>Due Date:</strong> ${dueDate}</li>
+  </ul>
+
+  
+  <footer style="margin-top: 30px; font-size: 12px; color: #999;">
+    <p style="font-size: 15px; color: #555;">Warm regards,</p>
+    <p style="font-size: 15px; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 0;">The CashFluence Team 💚</p>
+  </footer>
+`;
+
 
     const mailOptions = {
       from: process.env.SMTP_USER,
@@ -110,33 +132,43 @@ const sendAdminAlert = async (userId, loanId, emiNo, emiAmount, dueDate,adminEma
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Admin alert sent: EMI #${emiNo} - Loan #${loanId} (User ID: ${userId})`);
+    console.log(`Admin alert sent: EMI #${emiNo} - Loan #${loanId} (User ID: ${userId})`);
   } catch (error) {
-    console.error("❌ Error sending admin alert:", error);
+    console.error(" Error sending admin alert:", error);
   }
 };
 
-const sendFineAdminAlert = async (userId, loanId, emiNo, emiAmount, dueDate,adminEmail) => {
+const sendFineAdminAlert = async (userName,userId, loanId, emiNo, emiAmount, dueDate,adminEmail) => {
   try {
     const fineAmount = 50;
     const totalDue = emiAmount + fineAmount; 
 
-    const subject = `🚨 Urgent: Overdue EMI & Fine Alert - Loan #${loanId} (EMI #${emiNo})`;
-    
+    const subject = `*Admin Alert: Pending Penalty Payment from [User Name]*`;
+
     const message = `
-      <h2>🚨 Overdue EMI & Fine Alert</h2>
-      <p><strong>User ID:</strong> ${userId}</p>
-      <p><strong>Loan ID:</strong> #${loanId}</p>
-      <p><strong>EMI Number:</strong> #${emiNo}</p>
-      <p><strong>Original EMI Amount:</strong> $${emiAmount}</p>
-      <p><strong>Late Payment Fine:</strong> $${fineAmount}</p>
-      <p><strong>Total Due Amount:</strong> <span style="color: red;"><strong>$${totalDue}</strong></span></p>
-      <p><strong>Due Date:</strong> ${dueDate}</p>
+      <h2>Overdue EMI & Fine Alert</h2>
+      <p>Just noting that <strong>${userName}</strong> has an unpaid penalty. <br/>
+      Let's gently reach out to see if they need any assistance, helping ensure a smooth experience as they continue to grow their influencer journey with us.</p>
+      
+      <ul style="list-style-type: none; padding: 0;">
+        <li><strong>User ID:</strong> ${userId}</li>
+        <li><strong>Loan ID:</strong> #${loanId}</li>
+        <li><strong>EMI Number:</strong> #${emiNo}</li>
+        <li><strong>Original EMI Amount:</strong> $${emiAmount}</li>
+        <li><strong>Late Payment Fine:</strong> $${fineAmount}</li>
+        <li><strong>Total Due Amount:</strong> <span style="color: red;"><strong>$${totalDue}</strong></span></li>
+        <li><strong>Due Date:</strong> ${dueDate}</li>
+      </ul>
+    
       <hr>
-      <p style="color: red;"><strong>⚠️ Urgent Action Required:</strong></p>
-      <p>We have already sent the EMI payment link and the fine payment link to the user. However, the payment has still not been received.</p>
-      <p><strong>Immediate follow-up is needed.</strong> Please take the necessary steps to resolve this overdue payment.</p>
+    
+    
+      <footer style="margin-top: 30px; font-size: 12px; color: #999;">
+        <p style="font-size: 15px; color: #555;">Team effort, always,</p>
+        <p style="font-size: 15px; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 0;">The CashFluence Team 💚</p>
+      </footer>
     `;
+    
 
     const mailOptions = {
       from: process.env.SMTP_USER,
@@ -146,9 +178,9 @@ const sendFineAdminAlert = async (userId, loanId, emiNo, emiAmount, dueDate,admi
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Admin alert sent: Overdue EMI & Fine - EMI #${emiNo}, Loan #${loanId}, User ID: ${userId}`);
+    console.log(`Admin alert sent: Overdue EMI & Fine - EMI #${emiNo}, Loan #${loanId}, User ID: ${userId}`);
   } catch (error) {
-    console.error("❌ Error sending admin alert:", error);
+    console.error(" Error sending admin alert:", error);
   }
 };
 

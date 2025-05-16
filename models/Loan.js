@@ -63,6 +63,10 @@ const Loan = sequelize.define('Loan', {
     type: DataTypes.FLOAT, // Time taken in seconds
     allowNull: true,
   },
+ fee: {
+  type: DataTypes.FLOAT,
+  allowNull: true,
+},
   overdueStatus: { 
     type: DataTypes.STRING,
     allowNull: true, // Can be null initially

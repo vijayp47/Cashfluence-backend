@@ -9,7 +9,7 @@ exports.createPaymentIntent = async (req, res) => {
             return res.status(400).json({ error: "Missing amount or currency" });
         }
 
-        // ✅ Stripe expects amount in Cents
+        // Stripe expects amount in Cents
         const amountInCents = Math.round(amount * 100);
 
         const paymentIntent = await stripe.paymentIntents.create({
@@ -18,7 +18,7 @@ exports.createPaymentIntent = async (req, res) => {
             payment_method_types: ["card"],
         });
 
-        console.log("✅ Payment Intent Created:", paymentIntent.id);
+        console.log("Payment Intent Created:", paymentIntent.id);
 
         res.json({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
@@ -88,7 +88,7 @@ exports.retryPayment = async (req, res) => {
   
       return res.redirect(newSession.url);
     } catch (error) {
-      console.error("❌ Error in retry-payment:", error);
+      console.error("Error in retry-payment:", error);
       res.status(500).json({ error: error.message });
     }
   };

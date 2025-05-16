@@ -13,6 +13,9 @@ const getWeightPercentages = async () => {
     save_count: config.save_count / 100,
     impression_organic_count: config.impression_organic_count / 100,
     reach_organic_count: config.reach_organic_count / 100,
+    tweet_count:config.tweet_count /100 ,
+    retweet_count:config.retweet_count / 100
+   
   };
 };
 module.exports = { getWeightPercentages };

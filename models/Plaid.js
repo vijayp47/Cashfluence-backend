@@ -52,7 +52,12 @@ const Account = sequelize.define('Account', {
     //   model: 'Users',  // Reference to the 'Users' table
     //   key: 'id'    // The primary key column of Users
     // }
-  }
+  },
+    identity_data: {
+        type: DataTypes.JSONB, 
+        allowNull: true,
+    },
+  
 });
 
 // Define the Balances model

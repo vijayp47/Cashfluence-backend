@@ -1,8 +1,11 @@
 const messages = require("../constants/Messages");
 const Loan = require("../models/Loan");
 const User = require("../models/User");
+const LoanEligibility = require("../models/LoanEligibilityMatrix");
 const dotenv = require("dotenv");
 const nodemailer = require("nodemailer");
+const { isCompliantState, getAllowedInterest } = require("../services/loanCompliance");
+
 const {
   getTransactionsByUserAndLoan,
   getTransactionByEmi,
@@ -158,9 +161,9 @@ const sendDueDateReminderEmail = async (
     const emiAmountCents = Math.round(parseFloat(emiAmount) * 100);
     let paymentUrl = "";
 
-    // ✅ Check if the EMI is already paid
+    // Check if the EMI is already paid
     const isPaid = await getTransactionByEmi(userId, loanId, emiNo);
-    console.log(`🔍 EMI ${emiNo} Paid Status:`, isPaid);
+    console.log(` EMI ${emiNo} Paid Status:`, isPaid);
 
     if (!isPaid) {
       const session = await stripe.checkout.sessions.create({
@@ -259,12 +262,12 @@ if (daysLeft <= 0) {
 
       // Extract the amount
       if (!userInfo || userInfo?.length === 0) {
-        console.error(`❌ Error: No email found for User ID ${userId}`);
+        console.error(`Error: No email found for User ID ${userId}`);
         return;
       }
 
       const userEmail = userInfo[0]?.email;
-      console.log("emiAmount", emiAmount);
+    
 
       // Send fine email with correct user email
       await sendFineEmail(
@@ -316,7 +319,7 @@ if (daysLeft <= 0) {
         }
       }, 30 * 60 * 1000);
     } else {
-      console.log(`✅ EMI #${emiNo} is now paid. No fine email needed.`);
+      console.log(`EMI #${emiNo} is now paid. No fine email needed.`);
     }
   }, 2 * 60 * 1000); // Runs after 2 minutes
 
@@ -334,11 +337,11 @@ const mailOptions = {
   html: `${emailHeader}${message}`,
 };
 
-console.log(`📧 Email sent to ${userEmail} for EMI #${emiNo} of ${totalEmis}`);
+console.log(`Email sent to ${userEmail} for EMI #${emiNo} of ${totalEmis}`);
 return transporter.sendMail(mailOptions);
 
   } catch (error) {
-    console.error("❌ Error sending email:", error);
+    console.error("Error sending email:", error);
   }
 };
 
@@ -425,16 +428,18 @@ const loanCompletedStatus = async (req, res) => {
 
 // Controller to handle loan application submission
 const applyForLoan = async (req, res) => {
+ 
   try {
     const {
       amount,
+      fee,
       repaymentTerm,
       account,
       interest,
       loanrequested,
       riskLevel,
       riskScore,
-      fromAccount, // fromAccount as a whole object
+      fromAccount, 
 
       lastLoginAt,
     } = req.body;
@@ -452,6 +457,7 @@ const applyForLoan = async (req, res) => {
     // Create a loan application linked to the authenticated user
     const loanApplication = await Loan.create({
       amount,
+      fee,
       repaymentTerm,
       userId: req?.user?.userId,
       account,
@@ -466,6 +472,7 @@ const applyForLoan = async (req, res) => {
       // toAccount, // Storing the entire toAccount object
       submitTime,
       duration, // Save duration
+      
     });
 
     // Send response with the loan application details
@@ -519,7 +526,7 @@ const updateLoanStatus = async (req, res) => {
         .json({ success: false, message: "Loan status already updated" });
     }
 
-    // ✅ First: If approved, set the first due date (1 month after approval)
+    // First: If approved, set the first due date (1 month after approval)
     if (status === "Approved") {
       let firstDueDate = new Date(approvalDate);
       firstDueDate.setMonth(firstDueDate.getMonth() + 1); // Set due date one month after approval
@@ -529,7 +536,7 @@ const updateLoanStatus = async (req, res) => {
     }
 
     try {
-      // ✅ Send email notifications only if DB update is successful
+      // Send email notifications only if DB update is successful
       if (status === "Approved") {
         await sendLoanApprovalEmail(
           status,
@@ -558,7 +565,7 @@ const updateLoanStatus = async (req, res) => {
       } else if (status === "Rejected") {
         await sendLoanRejectEmail(status, userEmail, loanId);
       }
-      // ✅ Update loan status
+      //  Update loan status
       loan.status = status;
       await loan.save();
 
@@ -568,7 +575,7 @@ const updateLoanStatus = async (req, res) => {
         loan,
       });
     } catch (emailError) {
-      console.error("⚠ Email sending failed:", emailError);
+      console.error("Email sending failed:", emailError);
       return res.status(500).json({
         success: false,
         message: "Loan status updated, but failed to send notification email.",
@@ -576,7 +583,7 @@ const updateLoanStatus = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("⚠ Error updating loan status:", error);
+    console.error(" Error updating loan status:", error);
     res.status(500).json({
       success: false,
       message: "Error updating loan status",
@@ -625,6 +632,348 @@ const loanDuration = async (req, res) => {
   }
 };
 
+
+
+const checkLoanEligibility = async (req, res) => {
+  const { state, loan_amount, loan_term, calculated_interest } = req.query;
+
+  try {
+    // Convert parameters to appropriate types
+    const amount = parseFloat(loan_amount);
+    const term = parseInt(loan_term);
+    let interest = parseFloat(calculated_interest);
+
+    console.log("state", state);
+    const loanEligibility = await LoanEligibility.findOne({ where: { state } });
+    console.log("Loan Eligibility:", loanEligibility);
+
+    if (!loanEligibility) {
+      return res.status(400).json({ message: "State not found" });
+    }
+
+    // Check if loan type is allowed in the state
+    const isShortTerm = term <= 31; // Generally short term is <= 31 days
+
+    // --- Short-Term Loan Check ---
+    if (isShortTerm) {
+      if (!loanEligibility.short_term_allowed) {
+        return res.status(400).json({
+          message: `Short-term loans are not allowed in ${state}`
+        });
+      }
+
+      if (loanEligibility.short_term_max_amount && amount > loanEligibility.short_term_max_amount) {
+        return res.status(400).json({
+          message: `Loan amount exceeds short-term limit of $${loanEligibility.short_term_max_amount} in ${state}`
+        });
+      }
+
+      if (
+        (loanEligibility.short_term_min_term && term < loanEligibility.short_term_min_term) ||
+        (loanEligibility.short_term_max_term && term > loanEligibility.short_term_max_term)
+      ) {
+        return res.status(400).json({
+          message: `Loan term must be between ${loanEligibility.short_term_min_term || 'N/A'} and ${loanEligibility.short_term_max_term || 'N/A'} days for short-term loans in ${state}`
+        });
+      }
+
+      // Handle Florida short-term loans with tiered rates
+      if (state === 'Florida') {
+        const aprInfo = loanEligibility.max_installment_apr || '';
+        if (aprInfo.includes('tiered')) {
+          let minAPR = 18, maxAPR = 30; // Default values for Florida's tiered system
+          
+          // Use the user's requested loan term directly
+          // term is already parsed from loan_term in the query params
+          const minTerm = 7; // Minimum term for Florida
+          const maxTerm = 31; // Maximum term for Florida
+          
+          if (term <= minTerm) {
+            interest = maxAPR;
+          } else if (term >= maxTerm) {
+            interest = minAPR;
+          } else {
+            const termRatio = (term - minTerm) / (maxTerm - minTerm);
+            interest = maxAPR - termRatio * (maxAPR - minAPR);
+          }
+        }
+      }
+
+      return res.status(200).json({
+        eligible: true,
+        type: 'short-term',
+        adjusted_interest: interest,
+        message: `Eligible for short-term loan in ${state}`
+      });
+    } 
+    // --- Installment Loan Check ---
+    else {
+      if (!loanEligibility.installment_allowed) {
+        return res.status(400).json({
+          message: `Installment loans are not allowed in ${state}`
+        });
+      }
+
+      // Parse max_installment_apr from string to numerical values
+      let minAPR = null;
+      let maxAPR = null;
+      let hasAPRCap = true;
+      let isTiered = false;
+
+      if (loanEligibility.max_installment_apr) {
+        // Handle "No cap" case
+        if (loanEligibility.max_installment_apr.toLowerCase().includes('no cap')) {
+          hasAPRCap = false;
+      }
+        // Handle ranges with plus sign like "36%+"
+        else if (loanEligibility.max_installment_apr.includes('+') && !loanEligibility.max_installment_apr.includes('fee')) {
+          const baseRate = parseFloat(loanEligibility.max_installment_apr.replace('%+', ''));
+          minAPR = baseRate;
+          maxAPR = null; // No upper limit
+        }
+        // Handle ranges like "24%–36%" by splitting on dash or hyphen
+        else if (loanEligibility.max_installment_apr.includes('tiered')) {
+          isTiered = true;
+          // For tiered rates, extract the numbers and handle in the switch case
+          if (loanEligibility.max_installment_apr.includes('–') || 
+              loanEligibility.max_installment_apr.includes('-')) {
+            const delimiter = loanEligibility.max_installment_apr.includes('–') ? '–' : '-';
+            const tieredParts = loanEligibility.max_installment_apr.split(delimiter);
+            minAPR = parseFloat(tieredParts[1].replace('% tiered', '').trim());
+            maxAPR = parseFloat(tieredParts[0].replace('%', '').trim());
+          } else {
+            // Single value tiered like "36% tiered"
+            maxAPR = parseFloat(loanEligibility.max_installment_apr.replace('% tiered', ''));
+            minAPR = maxAPR; // Default if no range
+          }
+        }
+        // Handle ranges without "tiered"
+        else if (loanEligibility.max_installment_apr.includes('–') || 
+                loanEligibility.max_installment_apr.includes('-')) {
+          const delimiter = loanEligibility.max_installment_apr.includes('–') ? '–' : '-';
+          const ranges = loanEligibility.max_installment_apr.split(delimiter);
+          minAPR = parseFloat(ranges[0].replace('%', ''));
+          maxAPR = parseFloat(ranges[1].replace('%', ''));
+        }
+        // Handle percentage with additional fees
+        else if (loanEligibility.max_installment_apr.includes('+') && loanEligibility.max_installment_apr.includes('fee')) {
+          const baseRate = parseFloat(loanEligibility.max_installment_apr.split('+')[0].replace('%', ''));
+          maxAPR = baseRate;
+          minAPR = baseRate;
+        }
+        // Handle single values like "36%"
+        else {
+          const numericPart = loanEligibility.max_installment_apr.replace('%', '');
+          if (!isNaN(parseFloat(numericPart))) {
+            maxAPR = parseFloat(numericPart);
+            minAPR = maxAPR; // For single values, min and max are the same
+          }
+        }
+      }
+
+      // Special state-specific handling
+      switch(state) {
+        case 'Florida':
+          // Florida has tiered rates from 30% to 18% depending on loan term
+          if (isTiered && maxAPR && minAPR) {
+            const minTerm = loanEligibility.short_term_min_term || 7;
+            const maxTerm = loanEligibility.short_term_max_term || 31;
+            
+            if (term <= minTerm) {
+              interest = maxAPR; // 30% for shortest terms
+            } else if (term >= maxTerm) {
+              interest = minAPR; // 18% for longest terms
+            } else {
+              const termRatio = (term - minTerm) / (maxTerm - minTerm);
+              interest = maxAPR - termRatio * (maxAPR - minAPR);
+            }
+          }
+          break;
+
+        case 'Colorado':
+          // Colorado: 36% tiered system
+          if (isTiered) {
+            // In Colorado, we apply the tiered rate structure
+            // This is a simplified implementation - in real system, 
+            // you might want more complex tiers based on amount
+            if (amount <= 1000) {
+              interest = 36; // 36% for amounts up to $1000
+            } else if (amount <= 3000) {
+              interest = 32; // 32% for $1001-$3000
+            } else {
+              interest = 28; // 28% for amounts over $3000
+            }
+          }
+          break;
+
+        case 'California':
+          // California: 36% on loans <$2,500, no cap above $2,500
+          // Fixed the comparison: only apply cap when amount is LESS than 2500
+          if (amount < 2500 && interest > 36) {
+            interest = 36;
+          }
+          // For loans >= $2500, do not cap the interest rate
+          break;
+
+        case 'North Carolina':
+          // 30%/18% split (typically 30% for first $1000, 18% thereafter)
+          if (amount <= 1000) {
+            interest = Math.min(interest, 30);
+          } else {
+            // For amounts over $1000, calculate blended rate
+            // 30% on first $1000, 18% on remainder
+            const firstThousand = 1000 * 0.30;
+            const remainder = (amount - 1000) * 0.18;
+            const blendedInterest = (firstThousand + remainder) / amount * 100;
+            interest = Math.min(interest, Math.round(blendedInterest * 100) / 100);
+          }
+          break;
+
+        case 'Delaware':
+        case 'Missouri':
+        case 'Nevada':
+        case 'Texas':
+        case 'Utah':
+        case 'Idaho':
+          // States with no cap on interest rates
+          hasAPRCap = false;
+          break;
+
+        case 'Alaska':
+        case 'Tennessee':
+          // Range is 24%-36%
+          interest = Math.max(24, Math.min(interest, 36));
+          break;
+
+        case 'Indiana':
+          // Range is 36%-39%
+          interest = Math.max(36, Math.min(interest, 39));
+          break;
+
+        case 'New York':
+          // Extremely strict - 16% civil, 25% criminal
+          if (interest > 16) {
+            interest = 16;
+            // return res.status(400).json({
+            //   message: "Loan exceeds New York's 16% civil usury cap"
+            // });
+          }
+          break;
+
+        // case 'Arkansas':
+        //   // Constitutional cap of 17%
+        //   if (interest > 17) {
+        //     return res.status(400).json({
+        //       message: "Loan exceeds Arkansas's 17% constitutional cap"
+        //     });
+        //   }
+        //   break;
+        case 'Arkansas':
+  if (interest > 17) {
+    interest = 17; // Cap the interest instead of rejecting
+  }
+  break;
+
+        case 'Pennsylvania':
+          // Hard cap range of 6%-24%
+        if (interest < 6) {
+  interest = 6;  // Directly set to 6% if interest is less than 6%
+} else {
+  interest = Math.min(interest, 24);  // Otherwise, cap it at 24%
+}
+         
+          break;
+
+        case 'Massachusetts':
+          // 23% + $20 fee
+          if (interest > 23) {
+            interest = 23;
+          }
+          break;
+
+        case 'Georgia':
+          // 10% + fees
+          if (interest > 10) {
+            interest = 10;
+          }
+          break;
+
+        case 'Ohio':
+          // 28% + fees
+          if (interest > 28) {
+            interest = 28;
+          }
+          break;
+
+        default:
+          // Apply minimum APR if one exists and we have a cap
+          if (hasAPRCap && minAPR !== null && interest < minAPR) {
+            interest = minAPR;
+          }
+          
+          // Apply maximum APR if one exists and interest exceeds it and we have a cap
+          if (hasAPRCap && maxAPR !== null && interest > maxAPR) {
+            interest = maxAPR;
+          }
+          
+          // Also handle generic max APR cap for small loans
+          if (amount <= 2500 && ['Arizona', 'Illinois', 'Minnesota', 'Montana', 'Nebraska', 'New Hampshire', 
+                                'New Mexico', 'Oregon', 'South Dakota', 'Virginia', 'Washington', 'Wisconsin',
+                                'Wyoming'].includes(state) && interest > 36) {
+            interest = 36;
+          }
+          break;
+      }
+
+      // Calculate additional fees based on state
+      let additionalFees = 0;
+      let feeDescription = '';
+      
+      // State-specific fee calculations
+      switch(state) {
+        case 'Oregon':
+          additionalFees = 10; // $10 setup fee
+          feeDescription = '$10 setup fee';
+          break;
+        case 'Massachusetts':
+          additionalFees = 20; // $20 fee
+          feeDescription = '$20 service fee';
+          break;
+        case 'Virginia':
+          additionalFees = 50; // $50 fee
+          feeDescription = '$50 processing fee';
+          break;
+        case 'Ohio':
+          // Monthly maintenance fee
+          const monthlyFee = 10;
+          const months = Math.max(1, Math.ceil(term / 30));
+          additionalFees = monthlyFee * months;
+          feeDescription = `$${additionalFees} maintenance fee ($10/month)`;
+          break;
+        case 'Georgia':
+          if (amount <= 1000) {
+            additionalFees = Math.min(15, amount * 0.10); // 10% up to $15 max
+            feeDescription = `$${additionalFees.toFixed(2)} verification fee`;
+          }
+          break;
+      }
+
+      return res.status(200).json({
+        eligible: true,
+        type: 'installment',
+        adjusted_interest: interest,
+        has_apr_cap: hasAPRCap,
+        additional_fees: additionalFees > 0 ? additionalFees : null,
+        fee_description: feeDescription || null,
+        message: `Eligible for installment loan in ${state} with${hasAPRCap ? ' adjusted' : ''} APR${additionalFees > 0 ? ` and ${feeDescription}` : ''}`
+      });
+    }
+  } catch (error) {
+    console.error("Error checking loan eligibility:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 const getAllLoanOfSpecificUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -638,7 +987,7 @@ const getAllLoanOfSpecificUser = async (req, res) => {
     const loans = await Loan.findAll({
       where: { userId }, // Assuming userId exists in the Loan model
       attributes: [
-        'id', 'amount', 'interest', 'repaymentTerm', 'status', 'loanrequested', 
+        'id', 'amount','fee', 'interest', 'repaymentTerm', 'status', 'loanrequested', 
         'riskLevel', 'riskScore', 'dueDate', 'overdueStatus', 'isLoanComplete',  
         'submitTime', 'duration', 'createdAt'
       ],
@@ -649,11 +998,14 @@ const getAllLoanOfSpecificUser = async (req, res) => {
     if (!loans.length) {
       return res.status(404).json({ success: false, message: 'No loans found for this user' });
     }
+console.log("loans",loans);
 
     // Mask bank account details for security
     const sanitizedLoans = loans.map(loan => ({
       loanId: loan.id,
+    
       amount: loan.amount,
+        fee :loan.fee,
       interest: loan.interest,
       repaymentTerm: loan.repaymentTerm,
       status: loan.status,
@@ -663,8 +1015,7 @@ const getAllLoanOfSpecificUser = async (req, res) => {
       dueDate: loan.dueDate,
       overdueStatus: loan.overdueStatus,
       isLoanComplete: loan.isLoanComplete,
-      // fromAccount: loan.fromAccount ? maskAccount(loan.fromAccount) : null,
-      // toAccount: loan.toAccount ? maskAccount(loan.toAccount) : null,
+      
       submitTime: loan.submitTime,
       duration: loan.duration,
       createdAt: loan.createdAt,
@@ -678,13 +1029,6 @@ const getAllLoanOfSpecificUser = async (req, res) => {
   }
 };
 
-const maskAccount = (account) => {
-  if (!account || !account.accountNumber) return account;
-  return {
-    ...account,
-    accountNumber: `****${account.accountNumber.slice(-4)}`, // Show only last 4 digits
-  };
-};
 
 
 // Controller to get loan details (including status)
@@ -718,5 +1062,7 @@ module.exports = {
   updateLoanStatus,
   getLoanDetails,
   loanCompletedStatus,
-  loanDuration,getAllLoanOfSpecificUser
+  loanDuration,getAllLoanOfSpecificUser,
+  
+  checkLoanEligibility
 };

@@ -85,7 +85,15 @@ const PlaidUser = sequelize.define('PlaidUser', {
     type: DataTypes.STRING, // Store watchlist screening ID
     allowNull: true,
   },
+straddle_borrower_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
 
+    plaid_process_token: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
   // Timestamps
   createdAt: {
     type: DataTypes.DATE,
@@ -93,7 +101,7 @@ const PlaidUser = sequelize.define('PlaidUser', {
   },
   updatedAt: {
     type: DataTypes.DATE,
-    allowNull: false,
+  allowNull: false,
   },
 }, {
   tableName: 'PlaidUser',

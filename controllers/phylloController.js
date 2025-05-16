@@ -3,6 +3,7 @@ const axios = require("axios");
 const messages = require("../constants/Messages");
 const InterestRateTable = require("../models/InterestRateTable");
 const InterestRateStateData = require("../models/InterestRateStateData");
+const { isCompliantState, getAllowedInterest } = require("../services/loanCompliance");
 const PHYLLO_BASE_URL = process.env.PHYLLO_BASE_URL;
 const SANDBOX_TOKEN = process.env.SANDBOX_TOKEN;
 const AUTH_TOKEN = `Basic ${SANDBOX_TOKEN}`;
@@ -111,7 +112,7 @@ const createPhylloSDKToken = async (req, res) => {
     });
   }
 };
-const calculateAveragesAndQuality = async(contentData, platform) => {
+const calculateAveragesAndQuality = async (contentData, platform) => {
   const data = contentData.data;
 
   // Initialize accumulators and counters for platform-specific fields
@@ -128,6 +129,8 @@ const calculateAveragesAndQuality = async(contentData, platform) => {
     share_count: 0,
     unsubscribe_count: 0,
     spam_report_count: 0,
+    tweet_count: 0, // Added tweet_count for Twitter
+    retweet_count: 0, 
   };
 
   const counts = {
@@ -143,13 +146,15 @@ const calculateAveragesAndQuality = async(contentData, platform) => {
     share_count: 0,
     unsubscribe_count: 0,
     spam_report_count: 0,
+    tweet_count: 0, // Added tweet_count for Twitter
+    retweet_count: 0, 
   };
 
   // Loop through the data to calculate sums and counts, platform-specific
   data?.forEach((item) => {
     if (item.work_platform?.name === platform) { // Compare with work_platform.name
       Object.keys(totals).forEach((field) => {
-        if (item.engagement[field] !== null) {
+        if (item.engagement[field] !== null && item.engagement[field] !== undefined) {
           totals[field] += item.engagement[field];
           counts[field]++;
         }
@@ -157,27 +162,37 @@ const calculateAveragesAndQuality = async(contentData, platform) => {
     }
   });
 
+  // Calculate tweet_count based on the number of "TWEET" type content items
+  if (platform === "Twitter") {
+    const tweets = data.filter(item => item.type === "TWEET" && item.work_platform?.name === "Twitter");
+    totals.tweet_count = tweets.length; // Count number of tweets
+    counts.tweet_count = tweets.length; // Count number of tweets for averaging
+
+    // Calculate retweet_count based on the number of "RETWEET" type content items
+    const retweets = data.filter(item => item.type === "RETWEET" && item.work_platform?.name === "Twitter");
+    totals.retweet_count = retweets.length; // Count number of retweets
+    counts.retweet_count = retweets.length; // Count number of retweets for averaging
+  }
+
   // Calculate averages
   const averages = {};
   Object.keys(totals).forEach((field) => {
     averages[`avg_${field}`] =
       counts[field] > 0 ? totals[field] / counts[field] : 0;
   });
+
   const dbWeights = await getWeightPercentages();
-  console.log("dbWeights",dbWeights);
-  
 
   // Define weights for each metric (same for all platforms)
-
-
-  // Calculate content quality score as a weighted sum of the averages
   const qualityScore =
     averages.avg_like_count * dbWeights.like_count +
     averages.avg_comment_count * dbWeights.comment_count +
     averages.avg_share_count * dbWeights.share_count +
     averages.avg_save_count * dbWeights.save_count +
     averages.avg_impression_organic_count * dbWeights.impression_organic_count +
-    averages.avg_reach_organic_count * dbWeights.reach_organic_count;
+    averages.avg_reach_organic_count * dbWeights.reach_organic_count +
+    averages.avg_tweet_count * dbWeights.tweet_count +  // Including tweet_count in quality score
+    averages.avg_retweet_count * dbWeights.retweet_count; 
 
   // Return both averages and the content quality score for the selected platform
   return {
@@ -186,6 +201,7 @@ const calculateAveragesAndQuality = async(contentData, platform) => {
     contentQualityScore: qualityScore,
   };
 };
+
 
 const fetchPhylloPlatforms = async (req, res) => {
   const userId = req.query.user_id;
@@ -218,6 +234,7 @@ const fetchPhylloPlatforms = async (req, res) => {
 
     const platforms = platformResponse.data?.data || [];
 
+
     // Step 2: Fetch all accounts linked to this user
     const accountsResponse = await axios.get(`${PHYLLO_BASE_URL}/accounts?user_id=${savedUserId}`, {
       auth: {
@@ -230,9 +247,8 @@ const fetchPhylloPlatforms = async (req, res) => {
     });
 
     const accounts = accountsResponse.data?.data || [];
-
     // Step 3: Simplify and filter platform data
-    const platformsToInclude = ["Instagram", "YouTube", "TikTok"];
+    const platformsToInclude = ["Instagram", "YouTube", "TikTok","Twitch","X"];
 
     const simplifiedPlatforms = platforms
       .filter((platform) => platformsToInclude.includes(platform.name))
@@ -287,253 +303,6 @@ const fetchPhylloPlatforms = async (req, res) => {
 
 
 
-// const fetchanSocialAccount = async (req, res) => {
-//   try {
-//     const { work_platform_id, user_id, limit, platformName } = req?.query;  
-
-//     // Fetch accounts and profiles data
-//     const [accountsResponse, profilesResponse] = await Promise.all([
-//       axios.get(`${PHYLLO_BASE_URL}/accounts`, {
-//         params: { work_platform_id, user_id, limit, offset: 0 },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: { Authorization: AUTH_TOKEN },
-//       }),
-//       axios.get(`${PHYLLO_BASE_URL}/profiles`, {
-//         params: { work_platform_id, user_id, limit, offset: 0 },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: { Authorization: AUTH_TOKEN },
-//       }),
-//     ]);
-
-//     const account = accountsResponse.data.data[0];
-//     const matchedProfile = profilesResponse.data.data[0];
-//  const platformFields = {
-//       Instagram: { fields: ["follower_count", "following_count"] },
-//       YouTube: {
-//         fields: ["watch_time_in_hours", "average_open_rate"],
-//         extra: { is_verified: matchedProfile.is_verified },
-//       },
-//       TikTok: {
-//         fields: ["follower_count", "following_count", "watch_time_in_hours", "average_open_rate"],
-//         extra: { is_verified: matchedProfile.is_verified },
-//       },
-//     };
-
-//     let accountDetails = {
-//       username: matchedProfile.username,
-//       subscriber_count: matchedProfile.reputation.subscriber_count,
-//       paid_subscriber_count: matchedProfile.reputation.paid_subscriber_count,
-//       content_count: matchedProfile.reputation.content_count,
-//       like_count: matchedProfile.reputation.like_count,
-//       is_business: matchedProfile.is_business,
-//       platform_profile_name: matchedProfile.platform_profile_name,
-//       connection_count: matchedProfile.connection_count,
-//       work_experiences: matchedProfile.work_experiences,
-//       ...(platformFields[platformName]?.fields || []).reduce((acc, field) => {
-//         acc[field] = matchedProfile.reputation[field];
-//         return acc;
-//       }, {}),
-//       ...platformFields[platformName]?.extra,
-//     };
-
-  
-
-//     const contentResponse = await axios.get(`${PHYLLO_BASE_URL}/social/contents`, {
-//       params: {
-//         account_id: account.id,
-//         user_id,
-//         from_date: "2021-01-01",
-//         to_date: new Date().toISOString().split("T")[0],
-//         limit,
-//         offset: 0,
-//       },
-//       auth: {
-//         username: process.env.PHYLLO_API_USERNAME,
-//         password: process.env.PHYLLO_API_PASSWORD,
-//       },
-//       headers: { Authorization: AUTH_TOKEN },
-//     });
-
-//     if (contentResponse?.data?.data?.length > 0) {
-//       contentResponse?.data?.data?.forEach((item) => {
-//         const platform = item?.work_platform?.name;
-//         const result = calculateAveragesAndQuality(contentResponse?.data, platform);
-//    if (platform === "TikTok") {
-//           accountDetails = {
-//             ...accountDetails,
-//             average_like_count: result?.averages?.avg_like_count,
-//             average_dislike_count: result?.averages?.avg_dislike_count,
-//             average_comment_count: result?.averages?.avg_comment_count,
-//             average_impression_organic_count: result?.averages?.avg_impression_organic_count,
-//             average_reach_organic_count: result?.averages?.avg_reach_organic_count,
-//             average_save_count: result?.averages?.avg_save_count,
-//             average_view_count: result?.averages?.avg_view_count,
-//             average_replay_count: result?.averages?.avg_replay_count,
-//             average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
-//             average_share_count: result?.averages?.avg_share_count,
-//             average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
-//             average_spam_report_count: result?.averages?.avg_spam_report_count,
-//             average_content_quality_score: result.contentQualityScore,
-//           };
-//         } else if (platform === "Instagram") {
-//           accountDetails = {
-//             ...accountDetails,
-//             average_like_count: result?.averages?.avg_like_count,
-//             average_dislike_count: result?.averages?.avg_dislike_count,
-//             average_comment_count: result?.averages?.avg_comment_count,
-//             average_impression_organic_count: result?.averages?.avg_impression_organic_count,
-//             average_reach_organic_count: result?.averages?.avg_reach_organic_count,
-//             average_save_count: result?.averages?.avg_save_count,
-//             average_view_count: result?.averages?.avg_view_count,
-//             average_replay_count: result?.averages?.avg_replay_count,
-//             average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
-//             average_share_count: result?.averages?.avg_share_count,
-//             average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
-//             average_spam_report_count: result?.averages?.avg_spam_report_count,
-//             average_content_quality_score: result.contentQualityScore,
-//           };
-//         } else if (platform === "YouTube") {
-//           accountDetails = {
-//             ...accountDetails,
-//             average_like_count: result?.averages?.avg_like_count,
-//             average_dislike_count: result?.averages?.avg_dislike_count,
-//             average_comment_count: result?.averages?.avg_comment_count,
-//             average_impression_organic_count: result?.averages?.avg_impression_organic_count,
-//             average_reach_organic_count: result?.averages?.avg_reach_organic_count,
-//             average_save_count: result?.averages?.avg_save_count,
-//             average_view_count: result?.averages?.avg_view_count,
-//             average_replay_count: result?.averages?.avg_replay_count,
-//             average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
-//             average_share_count: result?.averages?.avg_share_count,
-//             average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
-//             average_spam_report_count: result?.averages?.avg_spam_report_count,
-//             average_content_quality_score: result.contentQualityScore,
-//           };
-//         }
-//       });
-//     } else {
-//       console.log("No data available to calculate averages.");
-//     }
-
-//     // Fetch income data
-//     const incomeResponse = await axios.get(`${PHYLLO_BASE_URL}/social/income/payouts`, {
-//       params: {
-//         user_id,
-//         account_id: account.id,
-//         payout_from_date: "2021-01-01",
-//         payout_to_date: new Date().toISOString().split("T")[0],
-//         limit,
-//         offset: 0,
-//       },
-//       auth: {
-//         username: process.env.PHYLLO_API_USERNAME,
-//         password: process.env.PHYLLO_API_PASSWORD,
-//       },
-//       headers: { Authorization: AUTH_TOKEN },
-//     });
-//     // const income = {
-//     //   "data": [
-//     //     {
-//     //       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-//     //       "created_at": "2020-03-27T12:56:34.534978",
-//     //       "updated_at": "2020-03-27T12:56:34.534978",
-//     //       "user": {
-//     //         "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
-//     //         "name": "John Doe"
-//     //       },
-//     //       "account": {
-//     //         "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
-//     //         "platform_username": "john.doe@gmail.com"
-//     //       },
-//     //       "work_platform": {
-//     //         "id": "fb83e3ca-eae7-4eaa-bf51-601ea4b3daeb",
-//     //         "name": "Instagram",
-//     //         "logo_url": "https://getphyllo.com/storage/instagram.png"
-//     //       },
-//     //       "amount": 123.45,
-//     //       "currency": "USD",
-//     //       "status": "SCHEDULED",
-//     //       "payout_interval": "AUTOMATIC_DAILY",
-//     //       "bank_details": {
-//     //         "name": "string",
-//     //         "account_last_digits": "string",
-//     //         "account_routing_number": "string"
-//     //       },
-//     //       "external_id": "5790fbc3-b022-437b-abf8-0492c7a82056",
-//     //       "payout_at": "2020-03-27T12:56:34.534978",
-//     //       "platform_profile_id": "UCEyLTzBtHJhlUwkeWhxfMXw",
-//     //       "platform_profile_name": "Peter Parker"
-//     //     }
-//     //   ],
-//     //   "metadata": [
-//     //     {
-//     //       "offset": 0,
-//     //       "limit": 10,
-//     //       "from_date": "2020-12-31",
-//     //       "to_date": "2021-12-31"
-//     //     }
-//     //   ]
-//     // };
-
-//     const incomeData = incomeResponse?.data[0]; 
-
-//     // Check if income data exists
-//     if (incomeResponse?.data?.length > 0) {
-//       const platform = incomeData?.work_platform?.name; // Platform name from income data
-//       const queryPlatform = platformName; // Platform name from query params
-    
-//       // Ensure that the platform in the query matches the platform in the income data
-//       if (platform === queryPlatform) {
-//         // Check platform and add the income details accordingly
-      
-//           accountDetails = {
-//             ...accountDetails,
-//               income_amount: incomeData?.amount,
-//               income_currency: incomeData?.currency,
-//               income_status: incomeData?.status,
-//               income_type: incomeData?.type,
-//               income_payout_interval: incomeData?.payout_interval,
-//           }
-//       }
-//     }
-    
-
-//     // Update database with demographics for all supported platforms
-//     const existingAccount = await InterestRateTable.findOne({
-//       where: { user_id },
-//     });
-
-//     const updatedAccountInfo = {
-//       user_id,
-//       instagram_data:
-//         platformName === "Instagram"
-//           ? accountDetails
-//           : existingAccount?.instagram_data,
-//       youtube_data:
-//         platformName === "YouTube"
-//           ? accountDetails
-//           : existingAccount?.youtube_data,
-//       tiktok_data:
-//         platformName === "TikTok"
-//           ? accountDetails
-//           : existingAccount?.tiktok_data,
-//       // Add other platforms' columns here as needed
-//     };
-
-//     await existingAccount.update(updatedAccountInfo);
-
-//     return res.status(200).json({ message: "Account data updated successfully!" });
-//   } catch (error) {
-//     console.error("Error updating account data:", error);
-//     return res.status(500).json({ error: "Failed to update account data" });
-//   }
-// };
 
 const fetchanSocialAccount = async (req, res) => {
   try {
@@ -567,30 +336,27 @@ const fetchanSocialAccount = async (req, res) => {
 // Filter accounts with status 'CONNECTED'
 const connectedAccounts = accounts.filter(account => account.status === 'CONNECTED');
     const profiles = profilesResponse?.data?.data;
-    console.log("profiles",profiles);
-    console.log("accounts",accounts);
-    console.log("accounts-length",accounts?.length);
+
+    const { engagement, identity } = accounts[0].data;
     
    // Define platform fields (this can be expanded based on platform)
     const platformFields = {
       Instagram: { fields: ["follower_count", "following_count"] },
       YouTube: { fields: ["watch_time_in_hours", "average_open_rate"] },
       TikTok: { fields: ["follower_count", "following_count", "watch_time_in_hours", "average_open_rate"] },
+      Twitch: { fields: ["follower_count", "average_viewers", "stream_hours", "subscriber_count"] },
+      Twitter: { fields: ["follower_count", "following_count", "tweet_count",  "retweet_count"] }
     };
 
-    // Iterate through accounts to gather the datay
+   // Iterate through accounts to gather the datay
     for (let i = 0; i < connectedAccounts.length; i++) {
       const account = connectedAccounts[i];
       
       const matchedProfile = profiles.find(profile => {
-        console.log('Checking profile:', profile);
-        console.log('account?.id', account?.id);
-        console.log('profile.account?.id?.id',profile.account?.id);
+       
         return profile.account?.id === account.id;
       });
        // Match using account.id or another identifier
-
-      console.log("matchedProfile", matchedProfile);
 
       if (!matchedProfile) {
         console.log(`Profile not found for account ${account.id}`);
@@ -634,11 +400,24 @@ const connectedAccounts = accounts.filter(account => account.status === 'CONNECT
         headers: { Authorization: AUTH_TOKEN },
       });
 
+
+      const allContents = contentResponse?.data?.data || [];
+
+      // Filter for Twitter-specific content
+      const tweets = allContents?.filter(item => 
+        item?.work_platform?.name === "Twitter" && item?.type === "TWEET"
+      );
+      const tweetCount = tweets.length;
+
+      const retweets = allContents.filter(item => item?.work_platform?.name === "Twitter" && item?.type === "RETWEET");
+      const retweetCount = retweets.length; 
+
+ 
       // if (contentResponse?.data?.data?.length > 0) {
         contentResponse?.data?.data?.forEach(async(item) => {
           const platform = item?.work_platform?.name;
           const result = await calculateAveragesAndQuality(contentResponse?.data, platform);
-         console.log("resultresultresultresult",result);
+      
          
           if (platform === "TikTok") {
             accountDetails = {
@@ -691,12 +470,28 @@ const connectedAccounts = accounts.filter(account => account.status === 'CONNECT
               average_spam_report_count: result?.averages?.avg_spam_report_count,
               average_content_quality_score: result?.contentQualityScore,
             };
+          } else if (platform === "Twitter") {
+            accountDetails = {
+              ...accountDetails,
+              average_like_count: result?.averages?.avg_like_count,
+              average_dislike_count: result?.averages?.avg_dislike_count,
+              average_comment_count: result?.averages?.avg_comment_count,
+              average_impression_organic_count: result?.averages?.avg_impression_organic_count,
+              average_reach_organic_count: result?.averages?.avg_reach_organic_count,
+              average_save_count: result?.averages?.avg_save_count,
+              average_view_count: result?.averages?.avg_view_count,
+              average_replay_count: result?.averages?.avg_replay_count,
+              average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
+              average_share_count: result?.averages?.avg_share_count,
+              average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
+              average_spam_report_count: result?.averages?.avg_spam_report_count,
+              average_tweet_count: tweetCount, 
+              average_retweet_count: retweetCount,
+              average_content_quality_score: result.contentQualityScore,
+            };
           }
         });
-      // } else {
-      //   console.log("No data available to calculate averages.");
-      // }
-
+   
       // Fetch income data for the account
       const incomeResponse = await axios.get(`${PHYLLO_BASE_URL}/social/income/payouts`, {
         params: {
@@ -766,7 +561,7 @@ const connectedAccounts = accounts.filter(account => account.status === 'CONNECT
         const queryPlatform = platformName;
       
         if (platform === queryPlatform) {
-          console.log("inside");
+        
           
           accountDetails = {
             ...accountDetails,
@@ -778,7 +573,7 @@ const connectedAccounts = accounts.filter(account => account.status === 'CONNECT
           };
         }
       }
-      console.log("accountDetails",accountDetails);
+     
       // Add the account details to the list
       accountDetailsList.push(accountDetails);
     }
@@ -802,6 +597,14 @@ const connectedAccounts = accounts.filter(account => account.status === 'CONNECT
         platformName === "TikTok"
           ? accountDetailsList
           : existingAccount?.tiktok_data,
+          twitch_data:
+          platformName === "Twitch"
+            ? accountDetailsList
+            : existingAccount?.twitch_data,
+            twitter_data:
+            platformName === "X"
+              ? accountDetailsList
+              : existingAccount?.twitter_data,
     };
 
     await existingAccount.update(updatedAccountInfo);
@@ -813,241 +616,6 @@ const connectedAccounts = accounts.filter(account => account.status === 'CONNECT
   }
 };
 
-
-// const fetchanSocialAccount = async (req, res) => {
-//   try {
-//     const { work_platform_id, user_id, limit, platformName } = req?.query;
-
-//     // Fetch accounts and profiles data
-//     const [accountsResponse, profilesResponse] = await Promise.all([
-//       axios.get(`${PHYLLO_BASE_URL}/accounts`, {
-//         params: { work_platform_id, user_id, limit, offset: 0 },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: { Authorization: AUTH_TOKEN },
-//       }),
-//       axios.get(`${PHYLLO_BASE_URL}/profiles`, {
-//         params: { work_platform_id, user_id, limit, offset: 0 },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: { Authorization: AUTH_TOKEN },
-//       }),
-//     ]);
-
-//     const accountDetailsList = []; // Array to hold multiple account details
-//     const accounts = accountsResponse.data.data;
-//     const profiles = profilesResponse.data.data;
-
-//     const platformFields = {
-//       Instagram: { fields: ["follower_count", "following_count"] },
-//       YouTube: {
-//         fields: ["watch_time_in_hours", "average_open_rate"],
-//       },
-//       TikTok: {
-//         fields: ["follower_count", "following_count", "watch_time_in_hours", "average_open_rate"],
-//       },
-//     };
-
-//     // Iterate through accounts
-//     for (let i = 0; i < accounts.length; i++) {
-//       const account = accounts[i];
-//       const matchedProfile = profiles[i];
-
-//       let accountDetails = {
-//         username: matchedProfile.username,
-//         subscriber_count: matchedProfile.reputation.subscriber_count,
-//         paid_subscriber_count: matchedProfile.reputation.paid_subscriber_count,
-//         content_count: matchedProfile.reputation.content_count,
-//         like_count: matchedProfile.reputation.like_count,
-//         is_business: matchedProfile.is_business,
-//         platform_profile_name: matchedProfile.platform_profile_name,
-//         connection_count: matchedProfile.connection_count,
-//         work_experiences: matchedProfile.work_experiences,
-//         ...(platformFields[platformName]?.fields || []).reduce((acc, field) => {
-//           acc[field] = matchedProfile.reputation[field];
-//           return acc;
-//         }, {}),
-//         ...platformFields[platformName]?.extra,
-//       };
-
-//       // Fetch content data for the account
-//       const contentResponse = await axios.get(`${PHYLLO_BASE_URL}/social/contents`, {
-//         params: {
-//           account_id: account.id,
-//           user_id,
-//           from_date: "2021-01-01",
-//           to_date: new Date().toISOString().split("T")[0],
-//           limit,
-//           offset: 0,
-//         },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: { Authorization: AUTH_TOKEN },
-//       });
-
-//       if (contentResponse?.data?.data?.length > 0) {
-//         contentResponse?.data?.data?.forEach((item) => {
-//           const platform = item?.work_platform?.name;
-//           const result = calculateAveragesAndQuality(contentResponse?.data, platform);
-
-//           if (platform === "TikTok") {
-//             accountDetails = {
-//               ...accountDetails,
-//               average_like_count: result?.averages?.avg_like_count,
-//               average_dislike_count: result?.averages?.avg_dislike_count,
-//               average_comment_count: result?.averages?.avg_comment_count,
-//               average_impression_organic_count: result?.averages?.avg_impression_organic_count,
-//               average_reach_organic_count: result?.averages?.avg_reach_organic_count,
-//               average_save_count: result?.averages?.avg_save_count,
-//               average_view_count: result?.averages?.avg_view_count,
-//               average_replay_count: result?.averages?.avg_replay_count,
-//               average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
-//               average_share_count: result?.averages?.avg_share_count,
-//               average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
-//               average_spam_report_count: result?.averages?.avg_spam_report_count,
-//               average_content_quality_score: result.contentQualityScore,
-//             };
-//           } else if (platform === "Instagram") {
-//             accountDetails = {
-//               ...accountDetails,
-//               average_like_count: result?.averages?.avg_like_count,
-//               average_dislike_count: result?.averages?.avg_dislike_count,
-//               average_comment_count: result?.averages?.avg_comment_count,
-//               average_impression_organic_count: result?.averages?.avg_impression_organic_count,
-//               average_reach_organic_count: result?.averages?.avg_reach_organic_count,
-//               average_save_count: result?.averages?.avg_save_count,
-//               average_view_count: result?.averages?.avg_view_count,
-//               average_replay_count: result?.averages?.avg_replay_count,
-//               average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
-//               average_share_count: result?.averages?.avg_share_count,
-//               average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
-//               average_spam_report_count: result?.averages?.avg_spam_report_count,
-//               average_content_quality_score: result.contentQualityScore,
-//             };
-//           } else if (platform === "YouTube") {
-//             accountDetails = {
-//               ...accountDetails,
-//               average_like_count: result?.averages?.avg_like_count,
-//               average_dislike_count: result?.averages?.avg_dislike_count,
-//               average_comment_count: result?.averages?.avg_comment_count,
-//               average_impression_organic_count: result?.averages?.avg_impression_organic_count,
-//               average_reach_organic_count: result?.averages?.avg_reach_organic_count,
-//               average_save_count: result?.averages?.avg_save_count,
-//               average_view_count: result?.averages?.avg_view_count,
-//               average_replay_count: result?.averages?.avg_replay_count,
-//               average_watch_time_in_hour: result?.averages?.avg_watch_time_in_hour,
-//               average_share_count: result?.averages?.avg_share_count,
-//               average_unsubscribe_count: result?.averages?.avg_unsubscribe_count,
-//               average_spam_report_count: result?.averages?.avg_spam_report_count,
-//               average_content_quality_score: result.contentQualityScore,
-//             };
-//           }
-//         });
-//       } else {
-//         console.log("No data available to calculate averages.");
-//       }
-
-//       // Fetch income data for the account
-//       const incomeResponse = await axios.get(`${PHYLLO_BASE_URL}/social/income/payouts`, {
-//         params: {
-//           user_id,
-//           account_id: account.id,
-//           payout_from_date: "2021-01-01",
-//           payout_to_date: new Date().toISOString().split("T")[0],
-//           limit,
-//           offset: 0,
-//         },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: { Authorization: AUTH_TOKEN },
-//       });
-
-//       const incomeData = incomeResponse?.data[0];
-//       if (incomeResponse?.data?.length > 0) {
-//         const platform = incomeData?.work_platform?.name;
-//         const queryPlatform = platformName;
-
-//         if (platform === queryPlatform) {
-//           accountDetails = {
-//             ...accountDetails,
-//             income_amount: incomeData?.amount,
-//             income_currency: incomeData?.currency,
-//             income_status: incomeData?.status,
-//             income_type: incomeData?.type,
-//             income_payout_interval: incomeData?.payout_interval,
-//           };
-//         }
-//       }
-
-//       // Add the account details to the list
-//       accountDetailsList.push(accountDetails);
-//     }
-
-//     // If more than 1 account, calculate averages
-//     if (accountDetailsList.length > 1) {
-//       const averagedData = calculateAverages(accountDetailsList);
-
-//       // Update the database with averaged data
-//       const existingAccount = await InterestRateTable.findOne({
-//         where: { user_id },
-//       });
-
-//       const updatedAccountInfo = {
-//         user_id,
-//         instagram_data:
-//           platformName === "Instagram"
-//             ? averagedData
-//             : existingAccount?.instagram_data,
-//         youtube_data:
-//           platformName === "YouTube"
-//             ? averagedData
-//             : existingAccount?.youtube_data,
-//         tiktok_data:
-//           platformName === "TikTok"
-//             ? averagedData
-//             : existingAccount?.tiktok_data,
-//       };
-
-//       await existingAccount.update(updatedAccountInfo);
-//     } else {
-//       // If only one account, save as is
-//       const existingAccount = await InterestRateTable.findOne({
-//         where: { user_id },
-//       });
-
-//       const updatedAccountInfo = {
-//         user_id,
-//         instagram_data:
-//           platformName === "Instagram"
-//             ? accountDetailsList[0]
-//             : existingAccount?.instagram_data,
-//         youtube_data:
-//           platformName === "YouTube"
-//             ? accountDetailsList[0]
-//             : existingAccount?.youtube_data,
-//         tiktok_data:
-//           platformName === "TikTok"
-//             ? accountDetailsList[0]
-//             : existingAccount?.tiktok_data,
-//       };
-
-//       await existingAccount.update(updatedAccountInfo);
-//     }
-
-//     return res.status(200).json({ message: "Account data updated successfully!" });
-//   } catch (error) {
-//     console.error("Error updating account data:", error);
-//     return res.status(500).json({ error: "Failed to update account data" });
-//   }
-// };
 
 const fetchConnectedAccountNames = async (req, res) => {
   const { userId } = req.params;
@@ -1062,14 +630,20 @@ const fetchConnectedAccountNames = async (req, res) => {
     const connectedPlatforms = [];
 
     // Check if the platform data exists and is non-null or non-empty
-    if (user.instagram_data && Object.keys(user.instagram_data).length > 0) {
+    if (user?.instagram_data && Object.keys(user?.instagram_data).length > 0) {
       connectedPlatforms.push('Instagram');
     }
-    if (user.youtube_data && Object.keys(user.youtube_data).length > 0) {
+    if (user?.youtube_data && Object.keys(user?.youtube_data).length > 0) {
       connectedPlatforms.push('YouTube');
     }
-    if (user.tiktok_data && Object.keys(user.tiktok_data).length > 0) {
+    if (user?.tiktok_data && Object.keys(user?.tiktok_data).length > 0) {
       connectedPlatforms.push('TikTok');
+    }
+    if (user?.twitch_data && Object.keys(user?.twitch_data).length > 0) {
+      connectedPlatforms.push('Twitch');
+    }
+    if (user?.twitter_data && Object.keys(user?.twitter_data).length > 0) {
+      connectedPlatforms.push('X');
     }
 
     return res.json({ connectedPlatforms }); // Return the list of connected platforms
@@ -1078,8 +652,6 @@ const fetchConnectedAccountNames = async (req, res) => {
     return res.status(500).json({ message: 'Internal Server Error' });
   }
 };
-
-
 const fetchDataFromdatabase = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -1121,8 +693,6 @@ const fetchDataFromdatabase = async (req, res) => {
   }
 };
 
-
-
 const fetchDataFromdatabaseAdmin = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -1163,6 +733,7 @@ const fetchDataFromdatabaseAdmin = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -1238,79 +809,6 @@ if (filteredData.length === 0) {
 
 
 
-
-
-// const fetchDataFromdatabase = async (req, res) => {
-//   try {
-//     const { userId, platformName } = req.query;
-
-//     if (!userId || !platformName) {
-//       return res.status(400).json({
-//         success: false,
-//         message:messages?.REQUIRED,
-//       });
-//     }
-
-//     // Fetch the existing account data for the user
-//     const existingAccount = await InterestRateTable.findOne({
-//       where: { user_id: userId },
-//     });
-
-//     if (!existingAccount) {
-//       return res.status(200).json({
-//         success: true,
-//         accountExists: false,
-//         message: `${messages?.NO_ACCOUNT} ${platformName}. ${messages?.PROCEED_CONNECT}`,
-//       });
-//     }
-
-//     // Dynamically check based on the platform name
-//     let accountData = null;
-//     switch (platformName) {
-//       case "Instagram":
-//         accountData = existingAccount.instagram_data;
-//         break;
-//       case "YouTube":
-//         accountData = existingAccount.youtube_data;
-//         break;
-//       case "Facebook":
-//         accountData = existingAccount.facebook_data;
-//         break;
-//       case "X":
-//         accountData = existingAccount.twitter_data;
-//         break;
-//       default:
-//         return res.status(400).json({
-//           success: false,
-//           message: messages?.INVALID_PLATFORM,
-//         });
-//     }
-
-//     if (accountData) {
-//       // Account already exists
-//       return res.status(200).json({
-//         success: true,
-//         accountExists: true,
-//         message: `An account for ${platformName} ${messages?.Exist} `,
-//         acountdata: existingAccount,
-//       });
-//     } else {
-//       // No account exists for this platform
-//       return res.status(200).json({
-//         success: true,
-//         accountExists: false,
-//         message: `${messages?.NO_ACCOUNT} ${platformName} exists. ${messages?.PROCEED_CONNECT}`,
-//       });
-//     }
-//   } catch (error) {
-//     console.error(messages?.SOCIAL_ACCOUNT_ERROR, error);
-//     return res.status(500).json({
-//       success: false,
-//       message: messages?.ERROR_SOCIAL_ACCOUNT,
-//       error: error.message,
-//     });
-//   }
-// };
 
 const deletePlatformData = async (req, res) => {
   const { userId, platformName, accountId } = req.body;
@@ -1420,237 +918,6 @@ const deletePlatformData = async (req, res) => {
 
 
 
-const getContent = async (req, res) => {
-  try {
-    // const savedUserId = req.session.savedUserId;
-    // if (!savedUserId) {
-    //   return res.status(400).json({ error: "User ID not found. Create a user first." });
-    // }
-
-    const response = await axios.get(
-      "https://api.sandbox.getphyllo.com/v1/social/contents",
-      {
-        params: {
-          account_id: "e98b75a3-6ed1-44f2-9fb0-7a6cccb75994", // accound id we are getting from account api result https://api.sandbox.getphyllo.com/v1/accounts?id=14d9ddf5-51c6-415e-bde6-f8ed36ad7054
-          from_date: "2021-01-31",
-          to_date: "2024-11-15",
-          offset: 0,
-          limit: 10,
-        },
-        auth: {
-          username: process.env.PHYLLO_API_USERNAME,
-          password: process.env.PHYLLO_API_PASSWORD,
-        },
-        headers: {
-          Authorization:
-            "Basic bm9haEB0aGVydWNrdXNsYWJzLmNvbTprZXAzITNSOHBHcTYhWmU=",
-        },
-      }
-    );
-
-    const contentData = response.data;
-    //here we are getting al profile if we pass profile id in api like this we will get particular profile
-    // https://api.sandbox.getphyllo.com/v1/profiles/{e38916f7-bd4b-40aa-9d04-a56814c5e375}
-
-    const userId = "5cc24c79-3e25-4d64-8da3-a99682d77e25";
-
-    // const platformData = platforms?.data?.map(platform => ({
-    //   id: platform.id,
-    //   name: platform.name,
-    //   userId: userId,
-    // }));
-
-    res.json({ success: true, contentData: contentData });
-  } catch (error) {
-    console.error("Error fetching Phyllo platforms:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch platforms",
-      error: error.message,
-    });
-  }
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// const getPublicationContent = async (req, res) => {
-//   try {
-//     // const savedUserId = req.session.savedUserId;
-//     // if (!savedUserId) {
-//     //   return res.status(400).json({ error: "User ID not found. Create a user first." });
-//     // }
-
-//     const response = await axios.get(
-//       "https://api.sandbox.getphyllo.com/v1/social/contents",
-//       {
-//         params: {
-//           account_id: "e98b75a3-6ed1-44f2-9fb0-7a6cccb75994", // accound id we are getting from account api result https://api.sandbox.getphyllo.com/v1/accounts?id=14d9ddf5-51c6-415e-bde6-f8ed36ad7054
-//           from_date: "2021-01-31",
-//           to_date: "2024-11-15",
-//           offset: 0,
-//           limit: 10,
-//         },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: {
-//           Authorization:
-//             "Basic bm9haEB0aGVydWNrdXNsYWJzLmNvbTprZXAzITNSOHBHcTYhWmU=",
-//         },
-//       }
-//     );
-
-//     const contentData = response.data;
-//     //here we are getting al profile if we pass profile id in api like this we will get particular profile
-//     // https://api.sandbox.getphyllo.com/v1/profiles/{e38916f7-bd4b-40aa-9d04-a56814c5e375}
-
-//     const userId = "5cc24c79-3e25-4d64-8da3-a99682d77e25";
-
-//     // const platformData = platforms?.data?.map(platform => ({
-//     //   id: platform.id,
-//     //   name: platform.name,
-//     //   userId: userId,
-//     // }));
-
-//     res.json({ success: true, contentData: contentData });
-//   } catch (error) {
-//     console.error("Error fetching Phyllo platforms:", error);
-//     res
-//       .status(500)
-//       .json({
-//         success: false,
-//         message: "Failed to fetch platforms",
-//         error: error.message,
-//       });
-//   }
-// };
-
-// const getComments = async (req, res) => {
-//   try {
-//     // const savedUserId = req.session.savedUserId;
-//     // if (!savedUserId) {
-//     //   return res.status(400).json({ error: "User ID not found. Create a user first." });
-//     // }
-
-//     const response = await axios.get(
-//       "https://api.sandbox.getphyllo.com/v1/social/comments",
-//       {
-//         params: {
-//           account_id: "e98b75a3-6ed1-44f2-9fb0-7a6cccb75994", // accound id we are getting from account api result https://api.sandbox.getphyllo.com/v1/accounts?id=14d9ddf5-51c6-415e-bde6-f8ed36ad7054
-//           from_date: "2021-01-31",
-//           to_date: "2024-11-15",
-//           offset: 0,
-//           limit: 10,
-//           content_id: "a91ccfb5-389b-4e35-b22f-da74a098fa32", // content id we will get from content api prv we integrated
-//         },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: {
-//           Authorization:
-//             "Basic bm9haEB0aGVydWNrdXNsYWJzLmNvbTprZXAzITNSOHBHcTYhWmU=",
-//         },
-//       }
-//     );
-
-//     const commentsOfparticularContent = response.data;
-//     //here we are getting al profile if we pass profile id in api like this we will get particular profile
-//     // https://api.sandbox.getphyllo.com/v1/profiles/{e38916f7-bd4b-40aa-9d04-a56814c5e375}
-
-//     const userId = "5cc24c79-3e25-4d64-8da3-a99682d77e25";
-
-//     // const platformData = platforms?.data?.map(platform => ({
-//     //   id: platform.id,
-//     //   name: platform.name,
-//     //   userId: userId,
-//     // }));
-
-//     res.json({ success: true, CommentsData: commentsOfparticularContent });
-//   } catch (error) {
-//     console.error("Error fetching Phyllo platforms:", error);
-//     res
-//       .status(500)
-//       .json({
-//         success: false,
-//         message: "Failed to fetch platforms",
-//         error: error.message,
-//       });
-//   }
-// };
-
-// const getSocialTrasactionOfParticularAccount = async (req, res) => {
-//   try {
-//     // const savedUserId = req.session.savedUserId;
-//     // if (!savedUserId) {
-//     //   return res.status(400).json({ error: "User ID not found. Create a user first." });
-//     // }
-
-//     const response = await axios.get(
-//       "https://api.sandbox.getphyllo.com/v1/social/income/transactions",
-//       {
-//         params: {
-//           account_id: "e98b75a3-6ed1-44f2-9fb0-7a6cccb75994", // accound id we are getting from account api result https://api.sandbox.getphyllo.com/v1/accounts?id=14d9ddf5-51c6-415e-bde6-f8ed36ad7054
-//           transaction_from_date: "2021-01-31",
-//           transaction_to_date: "2024-11-15",
-//           offset: 0,
-//           limit: 10,
-//           type: "", //type of transaction from social platforms
-//         },
-//         auth: {
-//           username: process.env.PHYLLO_API_USERNAME,
-//           password: process.env.PHYLLO_API_PASSWORD,
-//         },
-//         headers: {
-//           Authorization:
-//             "Basic bm9haEB0aGVydWNrdXNsYWJzLmNvbTprZXAzITNSOHBHcTYhWmU=",
-//         },
-//       }
-//     );
-
-//     const getSocialTrasactionData = response.data;
-//     //here we are getting al profile if we pass profile id in api like this we will get particular profile
-//     // https://api.sandbox.getphyllo.com/v1/profiles/{e38916f7-bd4b-40aa-9d04-a56814c5e375}
-
-//     const userId = "5cc24c79-3e25-4d64-8da3-a99682d77e25";
-
-//     // const platformData = platforms?.data?.map(platform => ({
-//     //   id: platform.id,
-//     //   name: platform.name,
-//     //   userId: userId,
-//     // }));
-
-//     res.json({ success: true, transactionData: getSocialTrasactionData });
-//   } catch (error) {
-//     console.error("Error fetching Phyllo platforms:", error);
-//     res
-//       .status(500)
-//       .json({
-//         success: false,
-//         message: "Failed to fetch platforms",
-//         error: error.message,
-//       });
-//   }
-// };
 
 module.exports = {
   createPhylloUser,
@@ -1662,7 +929,7 @@ module.exports = {
   fetchStateLawFromDatabase,
   fetchDataFromdatabaseAdmin,
   fetchConnectedAccountNames,
-
+  
   // getContent,
   // getPublicationContent,
   // getComments,

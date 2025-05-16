@@ -55,6 +55,7 @@ const sendOtpEmail = (name,email, otp) => {
 };
 
 // Register a new user
+// Register a new user
 const registerUser = async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
 
@@ -69,13 +70,13 @@ const registerUser = async (req, res) => {
     // Generate OTP
     const otp = crypto.randomBytes(3).toString("hex"); // 6-digit hex OTP
     const otpExpiration = Date.now() + 10 * 60 * 1000; // 10 minutes validity
+    console.log("Generated OTP:", otp);
+    console.log("OTP Expiration Time:", otpExpiration);
 
     if (user) {
       if (user.isVerified) {
-        // Already verified — reject signup
         return res.status(400).json({ message: messages?.USER_EXIST });
       } else {
-        // Not verified — update details (allow retry)
         user.firstName = firstName;
         user.lastName = lastName;
         user.password = hashedPassword;
@@ -84,7 +85,6 @@ const registerUser = async (req, res) => {
         await user.save();
       }
     } else {
-      // User doesn't exist — create new
       user = await User.create({
         firstName,
         lastName,
@@ -95,8 +95,7 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Send OTP email
-    await sendOtpEmail(firstName,email, otp);
+    await sendOtpEmail(firstName, email, otp);
     return res.status(201).json({ message: messages?.USER_REGISTERED });
   } catch (err) {
     console.error(messages?.REGISTRATION_ERROR, err);
@@ -109,30 +108,35 @@ const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    // Find the user by email
-
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(400).json({ message: messages?.USER_NOT_FOUND });
     }
 
-    // Check if OTP is valid
-    if (user.otp !== otp || Date.now() > user.otpExpiration) {
+   
+
+    if (user.otp !== otp) {
+      console.log("OTP mismatch");
       return res.status(400).json({ message: messages?.OTP_INVALID });
     }
 
-    // Update user to mark email as verified
+    if (Date.now() > user.otpExpiration) {
+      console.log("OTP expired");
+      return res.status(400).json({ message: messages?.OTP_INVALID });
+    }
+
     user.isVerified = true;
     user.otp = null; // Clear OTP after successful verification
     user.otpExpiration = null; // Clear OTP expiration date
     await user.save();
-
-    res.status(200).json({ message: messages?.EMAIL_VERIFIED });
+    
+    return res.status(200).json({ message: messages?.OTP_VERIFIED });
   } catch (err) {
-    console.error(messages?.OTP_VERIFICATION_ERROR, err);
-    res.status(500).json({ message: messages?.OTP_VERIFICATION_ERROR });
+    console.error("Verification error:", err);
+    return res.status(500).json({ message: messages?.OTP_VERIFICATION_ERROR });
   }
 };
+
 
 const resendOtp = async (req, res) => {
   const { email } = req.body;

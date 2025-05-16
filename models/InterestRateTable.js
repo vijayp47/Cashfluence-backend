@@ -34,10 +34,18 @@ const InterestRateTable = sequelize.define('InterestRateTable', {
         allowNull: true,
     },
     tiktok_data: {
-        type: DataTypes.JSONB, // Store Facebook-related data as JSON
+        type: DataTypes.JSONB, 
         allowNull: true,
     },
-
+    twitch_data: {
+        type: DataTypes.JSONB, 
+        allowNull: true,
+    },
+    twitter_data: {
+        type: DataTypes.JSONB, 
+        allowNull: true,
+    },
+  
     created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
