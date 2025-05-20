@@ -30,7 +30,7 @@ const sendLoanApprovalEmail = (
   adminName,
   adminEmail,
   userEmail,
-  transactionId,
+  // transactionId,
   userName,
   loanAmount,
   approvalDate,
@@ -65,7 +65,7 @@ const sendLoanApprovalEmail = (
   
     <ul style="list-style-type: none; padding: 0;">
       <li><strong>Approval Date:</strong> ${approvalDate}</li>
-      <li><strong>Transaction ID:</strong> ${transactionId}</li>
+
       <li><strong>Loan Amount:</strong> $${loanAmountNo.toFixed(2)}</li>
       <li><strong>Interest Amount:</strong> $${interestAmount.toFixed(2)}</li>
       <li><strong>Total Payable Amount:</strong> $${totalPayableAmount.toFixed(2)}</li>
@@ -494,7 +494,7 @@ const updateLoanStatus = async (req, res) => {
       adminName,
       adminEmail,
       userEmail,
-      transactionId,
+      // transactionId,
       userName,
       loanAmount,
       approvalDate,
@@ -543,7 +543,7 @@ const updateLoanStatus = async (req, res) => {
           adminName,
           adminEmail,
           userEmail,
-          transactionId,
+          // transactionId,
           userName,
           loanAmount,
           approvalDate,
@@ -642,10 +642,9 @@ const checkLoanEligibility = async (req, res) => {
     const amount = parseFloat(loan_amount);
     const term = parseInt(loan_term);
     let interest = parseFloat(calculated_interest);
+console.log("state",state);
 
-    console.log("state", state);
     const loanEligibility = await LoanEligibility.findOne({ where: { state } });
-    console.log("Loan Eligibility:", loanEligibility);
 
     if (!loanEligibility) {
       return res.status(400).json({ message: "State not found" });
@@ -996,7 +995,7 @@ const getAllLoanOfSpecificUser = async (req, res) => {
 
     // Check if loans exist
     if (!loans.length) {
-      return res.status(404).json({ success: false, message: 'No loans found for this user' });
+      return res.status(404).json({ success: false, message: 'You don’t have any loans at the moment.' });
     }
 console.log("loans",loans);
 

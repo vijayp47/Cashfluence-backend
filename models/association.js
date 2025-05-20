@@ -4,7 +4,7 @@ const { Account } = require('./Plaid');
 const Loan = require('./Loan');  // Import Loan model
 const Transaction = require('./Transaction'); // Import Transaction model
 
-// ✅ Define Associations Here (After Models Are Imported)
+// Define Associations Here (After Models Are Imported)
 
 // User  PlaidUser
 User.hasOne(PlaidUser, {

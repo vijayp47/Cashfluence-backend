@@ -13,6 +13,8 @@ const handleProcessorTokenCreation = async (req, res) => {
     const processorToken = await createStraddleProcessorToken(access_token, account_id);
     return res.status(200).json({ processor_token: processorToken });
   } catch (error) {
+    console.log("error--------",error);
+    
     res.status(500).json({ error: error.message });
   }
 };

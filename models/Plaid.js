@@ -57,8 +57,17 @@ const Account = sequelize.define('Account', {
         type: DataTypes.JSONB, 
         allowNull: true,
     },
-  
-});
+},
+  {
+   
+    indexes: [
+      {
+        unique: true,
+        fields: ['accountId', 'userId'],
+      },
+    ],
+  }
+);
 
 // Define the Balances model
 const Balances = sequelize.define('Balances', {
@@ -90,8 +99,19 @@ const Balances = sequelize.define('Balances', {
     type: DataTypes.INTEGER,
     allowNull: true,
     
+   },
+},
+  {
+   
+    indexes: [
+      {
+        unique: true,
+        fields: ['accountId', 'userId'],
+      },
+    ],
   }
-});
+);
+
 
 // Define the Mortgage model
 const Mortgage = sequelize.define('Mortgage', {
@@ -183,8 +203,19 @@ const Mortgage = sequelize.define('Mortgage', {
     type: DataTypes.INTEGER,
     allowNull: true,
     
+  },
+},
+  {
+   
+    indexes: [
+      {
+        unique: true,
+        fields: ['accountId', 'userId'],
+      },
+    ],
   }
-});
+);
+
 
 // Define the Student Loan model
 const StudentLoan = sequelize.define('StudentLoan', {
@@ -280,8 +311,19 @@ const StudentLoan = sequelize.define('StudentLoan', {
     type: DataTypes.INTEGER,
     allowNull: true,
     
+  },
+},
+  {
+   
+    indexes: [
+      {
+        unique: true,
+        fields: ['accountId', 'userId'],
+      },
+    ],
   }
-});
+);
+
 
 const Credit = sequelize.define('Credit', {
   accountId: {
@@ -324,8 +366,19 @@ const Credit = sequelize.define('Credit', {
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
+  },
+},
+  {
+   
+    indexes: [
+      {
+        unique: true,
+        fields: ['accountId', 'userId'],
+      },
+    ],
   }
-});
+);
+
 
 
 // Relationships

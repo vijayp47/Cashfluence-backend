@@ -583,6 +583,7 @@ const plaidIDVComplete = async (req, res, next) => {
     );
 
     const sessionId = metadata.link_session_id;
+console.log("sessionStatus",sessionStatus);
 
     //Fetch Regulatory Requirements using sessionId
     const response = await plaidClient.identityVerificationGet({
@@ -946,7 +947,6 @@ const getTransactions = async (req, res) => {
     res.status(500).json({ error: "An error occurred fetching transactions" });
   }
 };
-
 const getUserAccountData = async (req, res) => {
   const userId = req.query.userId;
 
@@ -1073,7 +1073,6 @@ const getUserAccountData = async (req, res) => {
       .json({ message: "Failed to fetch user data.", error: error.message });
   }
 };
-
 const getAverageBalance = async (req, res) => {
   const { accessToken, startDate, endDate } = req.body;
 
@@ -1116,7 +1115,6 @@ const getAverageBalance = async (req, res) => {
     res.status(500).json({ error: "An error occurred fetching transactions" });
   }
 };
-
 const deleteBankDetails = async (req, res) => {
   const { userId, institutionId } = req.body;
 
@@ -1196,16 +1194,22 @@ const deleteAccountDetails = async (req, res) => {
 };
 const getPlaidProcessTokenByUserId = async (req, res) => {
   try {
+    console.log("inside-----");
+    
     const { user_id } = req.params;
 
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
     }
 
+    console.log("user_id",user_id);
+    
+
     const user = await PlaidUser.findOne({
       where: { user_id },
       attributes: ['plaid_process_token']
     });
+
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

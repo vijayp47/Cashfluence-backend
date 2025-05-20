@@ -72,6 +72,15 @@ const Loan = sequelize.define('Loan', {
     allowNull: true, // Can be null initially
     defaultValue: null, // Possible values: null, 'Overdue'
   },
+  payoutId: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
+  disbursementPaymentStatus: {
+  type: DataTypes.STRING,
+  allowNull: true,
+  defaultValue: 'Pending', 
+},
 }, {
   timestamps: true, // Sequelize will auto-manage createdAt/updatedAt
 });

@@ -550,76 +550,66 @@ const getAdminProfile = async (req, res) => {
     });
   }
 };
-
-
 const getFilterData = async (req, res) => {
   try {
     const { overdueStatus } = req.query;
 
-    // Apply overdue status filtering if needed
     const whereCondition = {};
     if (overdueStatus && overdueStatus !== "All") {
-      if (overdueStatus === "Overdue") {
-        whereCondition.overdueStatus = "Overdue";
-      } else if (overdueStatus === "Not Overdue") {
-        whereCondition.overdueStatus = { [Op.ne]: "Overdue" };
-      }
+      whereCondition.overdueStatus = 
+        overdueStatus === "Overdue" ? "Overdue" : { [Op.ne]: "Overdue" };
     }
 
-    // Fetch all loans with fromAccount and toAccount details
+    // Fetch raw fromAccount and toAccount JSON strings
     const loans = await Loan.findAll({
-      attributes: [
-        [Sequelize.json('fromAccount.accountNumber'), 'accountNumber'],
-        [Sequelize.json('fromAccount.institutionName'), 'institutionName'],
-        [Sequelize.json('fromAccount.accountName'), 'accountName'],
-        [Sequelize.json('toAccount.accountNumber'), 'accountNumberTo'],
-        [Sequelize.json('toAccount.institutionName'), 'institutionNameTo'],
-        [Sequelize.json('toAccount.accountName'), 'accountNameTo'],
-        "overdueStatus", // Include overdue status
-      ],
-      where: whereCondition, // Apply overdue status filtering
+      attributes: ['id', 'fromAccount', 'toAccount', 'overdueStatus'],
+      where: whereCondition,
     });
 
-    // Extract and format unique account data
     const accountData = [];
 
     loans.forEach(loan => {
-      if (loan.dataValues.accountNumber && loan.dataValues.institutionName && loan.dataValues.accountName) {
-        accountData.push({
-          accountNumber: loan.dataValues.accountNumber,
-          institutionName: loan.dataValues.institutionName,
-          accountName: loan.dataValues.accountName,
-          overdueStatus: loan.dataValues.overdueStatus, // Include overdue status
-        });
-      }
-      if (loan.dataValues.accountNumberTo && loan.dataValues.institutionNameTo && loan.dataValues.accountNameTo) {
-        accountData.push({
-          accountNumber: loan.dataValues.accountNumberTo,
-          institutionName: loan.dataValues.institutionNameTo,
-          accountName: loan.dataValues.accountNameTo,
-          overdueStatus: loan.dataValues.overdueStatus, // Include overdue status
-        });
+      try {
+      const fromAccount = typeof loan.fromAccount === 'string' ? JSON.parse(loan.fromAccount) : loan.fromAccount || {};
+const toAccount = typeof loan.toAccount === 'string' ? JSON.parse(loan.toAccount) : loan.toAccount || {};
+
+        if (fromAccount.accountNumber && fromAccount.institutionName && fromAccount.accountName) {
+          accountData.push({
+            accountNumber: fromAccount.accountNumber,
+            institutionName: fromAccount.institutionName,
+            accountName: fromAccount.accountName,
+            overdueStatus: loan.overdueStatus,
+          });
+        }
+
+        if (toAccount.accountNumber && toAccount.institutionName && toAccount.accountName) {
+          accountData.push({
+            accountNumber: toAccount.accountNumber,
+            institutionName: toAccount.institutionName,
+            accountName: toAccount.accountName,
+            overdueStatus: loan.overdueStatus,
+          });
+        }
+      } catch (err) {
+        console.warn(`Failed to parse accounts JSON for loan ${loan.id}`, err);
       }
     });
 
-    // Remove duplicates efficiently
+    // Deduplicate accounts
     const uniqueAccounts = Array.from(
       new Map(accountData.map(item => [JSON.stringify(item), item])).values()
     );
 
-    // Send response with distinct account data
     res.status(200).json({
       success: true,
       accountsData: uniqueAccounts,
     });
   } catch (error) {
     console.error('Error fetching accounts data:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching account data',
-    });
+    res.status(500).json({ success: false, message: 'Error fetching account data' });
   }
 };
+
 
 const getUserDataForStatus = async (req, res) => {
   const { userId } = req.params;
@@ -705,7 +695,7 @@ const getUsersWithLoans = async (req, res) => {
       institutionName,
       accountName,
       searchQuery,
-      overdueStatus, // New Overdue Status Filter
+      overdueStatus,
     } = req.query;
 
     const usersPerPage = 10;
@@ -713,17 +703,46 @@ const getUsersWithLoans = async (req, res) => {
 
     let loanFilter = {};
     if (loanStatus) loanFilter.status = loanStatus;
+
+    // Parse amounts to numbers before filtering
     if (loanMinAmount && loanMaxAmount) {
-      loanFilter.amount = { [Op.between]: [loanMinAmount, loanMaxAmount] };
+      const minAmountNum = parseFloat(loanMinAmount);
+      const maxAmountNum = parseFloat(loanMaxAmount);
+      if (!isNaN(minAmountNum) && !isNaN(maxAmountNum)) {
+        loanFilter.amount = { [Op.between]: [minAmountNum, maxAmountNum] };
+      }
     }
 
-    // Apply Overdue Status filter
+    // Overdue status filter
     if (overdueStatus) {
-      if (overdueStatus === "Overdue") {
-        loanFilter.overdueStatus = "Overdue";
-      } else if (overdueStatus === "Not Overdue") {
-        loanFilter.overdueStatus = { [Op.ne]: "Overdue" };
-      }
+      loanFilter.overdueStatus =
+        overdueStatus === "Overdue" ? "Overdue" : { [Op.ne]: "Overdue" };
+    }
+
+    // Add filters on nested JSON fields if your DB supports JSON querying (e.g., Postgres JSONB)
+    // Otherwise, this won't work and you need to fetch & filter in JS (not scalable)
+    if (accountNumber) {
+      loanFilter[Op.and] = loanFilter[Op.and] || [];
+      loanFilter[Op.and].push(Sequelize.where(
+        Sequelize.json('fromAccount.accountNumber'),
+        { [Op.iLike]: `%${accountNumber}%` }
+      ));
+    }
+
+    if (institutionName) {
+      loanFilter[Op.and] = loanFilter[Op.and] || [];
+      loanFilter[Op.and].push(Sequelize.where(
+        Sequelize.json('fromAccount.institutionName'),
+        { [Op.iLike]: `%${institutionName}%` }
+      ));
+    }
+
+    if (accountName) {
+      loanFilter[Op.and] = loanFilter[Op.and] || [];
+      loanFilter[Op.and].push(Sequelize.where(
+        Sequelize.json('fromAccount.accountName'),
+        { [Op.iLike]: `%${accountName}%` }
+      ));
     }
 
     let userWhereCondition = {};
@@ -762,7 +781,7 @@ const getUsersWithLoans = async (req, res) => {
         {
           model: Loan,
           as: "loans",
-          where: { ...loanFilter, ...loanIdFilter }, // Overdue filter applied
+          where: { ...loanFilter, ...loanIdFilter },
           required: Object.keys(loanFilter).length > 0 || Object.keys(loanIdFilter).length > 0,
           include: [
             {
@@ -817,6 +836,7 @@ const getUsersWithLoans = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch users" });
   }
 };
+
 
 const getAllUsersWithLoans = async (req, res) => {
   try {
