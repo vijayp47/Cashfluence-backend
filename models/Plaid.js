@@ -57,16 +57,7 @@ const Account = sequelize.define('Account', {
         type: DataTypes.JSONB, 
         allowNull: true,
     },
-},
-  {
-   
-    indexes: [
-      {
-        unique: true,
-        fields: ['accountId', 'userId'],
-      },
-    ],
-  }
+}
 );
 
 // Define the Balances model
@@ -100,16 +91,7 @@ const Balances = sequelize.define('Balances', {
     allowNull: true,
     
    },
-},
-  {
-   
-    indexes: [
-      {
-        unique: true,
-        fields: ['accountId', 'userId'],
-      },
-    ],
-  }
+}
 );
 
 
@@ -204,16 +186,7 @@ const Mortgage = sequelize.define('Mortgage', {
     allowNull: true,
     
   },
-},
-  {
-   
-    indexes: [
-      {
-        unique: true,
-        fields: ['accountId', 'userId'],
-      },
-    ],
-  }
+}
 );
 
 
@@ -312,16 +285,7 @@ const StudentLoan = sequelize.define('StudentLoan', {
     allowNull: true,
     
   },
-},
-  {
-   
-    indexes: [
-      {
-        unique: true,
-        fields: ['accountId', 'userId'],
-      },
-    ],
-  }
+}
 );
 
 
@@ -367,16 +331,7 @@ const Credit = sequelize.define('Credit', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-},
-  {
-   
-    indexes: [
-      {
-        unique: true,
-        fields: ['accountId', 'userId'],
-      },
-    ],
-  }
+}
 );
 
 
